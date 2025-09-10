@@ -9,6 +9,8 @@ Another EVE Online Discord bot, because apparently there aren't enough already. 
 ![Screenshot of the bot posting a killmail]
 *(A screenshot proving it occasionally works)*
 
+<img width="480" height="204" alt="image" src="https://github.com/user-attachments/assets/a6d42196-813f-444e-9701-85b94d3d99cc" />
+
 ---
 
 ## ✨ Features (The Things It Does)
