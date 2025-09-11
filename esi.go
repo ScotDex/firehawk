@@ -16,6 +16,7 @@ type ESIClient struct {
 	userAgent  string
 
 	characterNames   map[int]string
+	characterIDs     map[string]int
 	corporationNames map[int]string
 	shipNames        map[int]string
 	systemNames      map[int]string
@@ -35,6 +36,7 @@ func NewESIClient(contactInfo string) *ESIClient {
 		corporationNames: make(map[int]string),
 		shipNames:        make(map[int]string),
 		systemNames:      make(map[int]string),
+		characterIDs:     make(map[string]int),
 	}
 }
 
@@ -111,6 +113,16 @@ type EsiIDResponse struct {
 // GetCharacterID resolves a character name to its ID using the POST endpoint.
 func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 	log.Println("DEBUG: Looking up character ID for:", characterName)
+	// First, check the cache
+	c.cacheMutex.RLock()
+	id, found := c.characterIDs[characterName]
+	c.cacheMutex.RUnlock()
+	if found {
+		log.Println("DEBUG: Cache HIT for character:", characterName)
+		return id, nil // If found, return the ID immediately.
+	}
+	// Cache miss; proceed to call the API
+	log.Println("DEBUG: Cache MISS for character:", characterName)
 	requestBody, _ := json.Marshal([]string{characterName})
 	fullURL := fmt.Sprintf("%s/universe/ids", c.baseURL)
 
@@ -139,7 +151,12 @@ func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 	if idData.Characters == nil || len(idData.Characters) == 0 {
 		return 0, fmt.Errorf("character not found: %s", characterName)
 	}
+	// Assuming the first match is the desired character
+	fetchedID := idData.Characters[0].ID
+	c.cacheMutex.Lock()
+	c.characterIDs[characterName] = fetchedID
+	c.cacheMutex.Unlock()
 
 	// Return the ID of the first character found
-	return idData.Characters[0].ID, nil
+	return fetchedID, nil
 }
