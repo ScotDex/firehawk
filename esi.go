@@ -158,11 +158,12 @@ func (c *ESIClient) GetShipName(id int) string {
 func (c *ESIClient) GetSystemName(id int) string {
 	return c.getName(id, "universe/systems", c.systemNames)
 }
-func (c *ESIClient) GetSystemID(id int) string {
-	return c.getName(id, "universe/systems", c.systemNames)
-}
-func (c *ESIClient) GetSystemInfo(id int) string {
-	return c.getName(id, "universe/systems", c.systemNames)
-}
+
+//func (c *ESIClient) GetSystemID(id int) string {
+//	return c.getName(id, "universe/systems", c.systemNames)
+//}
+//func (c *ESIClient) GetSystemInfo(id int) string {
+//	return c.getName(id, "universe/systems", c.systemNames)
+//}
 
 // ... (Add GetSystemInfo and GetSystemID here, following the same pattern)

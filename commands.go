@@ -37,9 +37,9 @@ var commands = []*discordgo.ApplicationCommand{
 }
 
 var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
-	"status":      handleStatusCommand,
-	"lookup":      handleLookupCommand,
-	"scout":       handleScoutCommand,
+	"status": handleStatusCommand,
+	"lookup": handleLookupCommand,
+	//	"scout":       handleScoutCommand,
 	"subscribe":   handleSubscribeCommand,
 	"unsubscribe": handleUnsubscribeCommand,
 }
@@ -99,34 +99,34 @@ func handleLookupCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	sendEmbedResponse(s, i, embed)
 }
 
-func handleScoutCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{Type: discordgo.InteractionResponseDeferredChannelMessageWithSource})
-
-	options := parseOptions(i)
-	systemName := options["system_name"].StringValue()
-
-	systemID, err := esiClient.GetSystemID(systemName)
-	if err != nil {
-		sendErrorResponse(s, i, "❌ Could not find a solar system with that name.")
-		return
-	}
-	systemInfo, err := esiClient.GetSystemInfo(systemID)
-	if err != nil {
-		sendErrorResponse(s, i, "❌ Could not retrieve details for that system.")
-		return
-	}
-	embed := &discordgo.MessageEmbed{
-		Title: "System Intel: " + systemInfo.Name,
-		Color: 0x42b6f5,
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "Security Status", Value: fmt.Sprintf("%.1f", systemInfo.SecurityStatus), Inline: true},
-			{Name: "Stargates", Value: fmt.Sprintf("%d", len(systemInfo.Stargates)), Inline: true},
-			{Name: "Stations", Value: fmt.Sprintf("%d", len(systemInfo.Stations)), Inline: true},
-		},
-		Footer: &discordgo.MessageEmbedFooter{Text: fmt.Sprintf("System ID: %d", systemInfo.SystemID)},
-	}
-	sendEmbedResponse(s, i, embed)
-}
+//func handleScoutCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+//	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{Type: discordgo.InteractionResponseDeferredChannelMessageWithSource})
+//
+//	options := parseOptions(i)
+//	systemName := options["system_name"].StringValue()
+//
+//	systemID, err := esiClient.GetSystemID(systemName)
+//	if err != nil {
+//		sendErrorResponse(s, i, "❌ Could not find a solar system with that name.")
+//		return
+//	}
+//	systemInfo, err := esiClient.GetSystemInfo(systemID)
+//	if err != nil {
+//		sendErrorResponse(s, i, "❌ Could not retrieve details for that system.")
+//		return
+//	}
+//	embed := &discordgo.MessageEmbed{
+//		Title: "System Intel: " + systemInfo.Name,
+//		Color: 0x42b6f5,
+//		Fields: []*discordgo.MessageEmbedField{
+//			{Name: "Security Status", Value: fmt.Sprintf("%.1f", systemInfo.SecurityStatus), Inline: true},
+//			{Name: "Stargates", Value: fmt.Sprintf("%d", len(systemInfo.Stargates)), Inline: true},
+//			{Name: "Stations", Value: fmt.Sprintf("%d", len(systemInfo.Stations)), Inline: true},
+//		},
+//		Footer: &discordgo.MessageEmbedFooter{Text: fmt.Sprintf("System ID: %d", systemInfo.SystemID)},
+//	}
+//	sendEmbedResponse(s, i, embed)
+//}
 
 func handleSubscribeCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	options := parseOptions(i)
