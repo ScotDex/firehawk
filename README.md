@@ -1,4 +1,4 @@
-# Firehawk Bot 🔥
+# Firehawk Bot 🔥 (DONT SELF HOST YET!)
 
 [![Go Version](https://img.shields.io/badge/go-1.22-blue.svg)](https://golang.org)
 [![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?label=Support%20Server)](https://discord.gg/YOUR_INVITE_LINK)
