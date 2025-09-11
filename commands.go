@@ -102,6 +102,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
+
 		status, err := getAPIStatus()
 		if err != nil {
 			log.Printf("Error fetching API status: %v", err)
@@ -110,8 +111,10 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			})
 			return
 		}
+
 		uptime := time.Since(status.StartTime)
 		uptimeStr := fmt.Sprintf("%d hours, %d minutes", int(uptime.Hours()), int(uptime.Minutes())%60)
+
 		embed := &discordgo.MessageEmbed{
 			Title: "EVE Online Server Status",
 			Color: 0x00ff00,
@@ -122,6 +125,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			},
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
+
 		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Embeds: []*discordgo.MessageEmbed{embed},
 		})
@@ -131,22 +135,39 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"lookup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		// Defer the response to give us more time
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 		charName := i.ApplicationCommandData().Options[0].StringValue()
 		charID, err := esiClient.GetCharacterID(charName)
 		if err != nil {
-			errorMessage := fmt.Sprintf("❌ Could not find a character named `%s`.", charName)
+			log.Printf("Error looking up character ID for '%s': %v", charName, err)
+			errormmessage := fmt.Sprintf("❌ Error looking up character ID for '%s'.", charName)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-				Content: &errorMessage,
+				Content: &errormmessage,
 			})
 			return
 		}
+
 		finalURL := fmt.Sprintf("https://eve-kill.com/character/%d", charID)
-		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content: &finalURL,
+
+		embed := &discordgo.MessageEmbed{
+			Title:       fmt.Sprintf("View '%s' on EVE-KILL", charName),
+			Description: fmt.Sprintf("Direct killboard link for character ID: %d", charID),
+			URL:         finalURL, // This makes the Title a clickable link.
+			Color:       0x42b6f5, // Blue
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: fmt.Sprintf("https://images.evetech.net/characters/%d/portrait", charID),
+			},
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+		_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Embeds: &[]*discordgo.MessageEmbed{embed},
 		})
+		if err != nil {
+			log.Printf("Failed to edit interaction for lookup: %v", err)
+		}
 	},
 
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -155,6 +176,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		for _, opt := range options {
 			optionMap[opt.Name] = opt
 		}
+
 		topic := optionMap["topic"].StringValue()
 		var channelID string
 		if channelOption, ok := optionMap["channel"]; ok {
@@ -162,6 +184,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		} else {
 			channelID = i.ChannelID
 		}
+
 		guildID := i.GuildID
 		if _, ok := subscriptions[guildID]; !ok {
 			subscriptions[guildID] = make(map[string][]string)
@@ -169,9 +192,11 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		if _, ok := subscriptions[guildID][channelID]; !ok {
 			subscriptions[guildID][channelID] = []string{}
 		}
+
 		subscriptions[guildID][channelID] = append(subscriptions[guildID][channelID], topic)
 		log.Printf("New subscription added: Guild %s, Channel %s, Topic %s", guildID, channelID, topic)
 		responseMessage := fmt.Sprintf("✅ Subscribed channel <#%s> to the '%s' topic.", channelID, topic)
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -186,6 +211,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		for _, opt := range options {
 			optionMap[opt.Name] = opt
 		}
+
 		topicToRemove := optionMap["topic"].StringValue()
 		var channelID string
 		if channelOption, ok := optionMap["channel"]; ok {
@@ -193,6 +219,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		} else {
 			channelID = i.ChannelID
 		}
+
 		guildID := i.GuildID
 		if _, ok := subscriptions[guildID][channelID]; !ok {
 			responseMessage := fmt.Sprintf("⚠️ This channel isn't subscribed to any topics.")
@@ -202,6 +229,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			})
 			return
 		}
+
 		originalTopics := subscriptions[guildID][channelID]
 		newTopics := []string{}
 		found := false
@@ -212,6 +240,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 				found = true
 			}
 		}
+
 		var responseMessage string
 		if !found {
 			responseMessage = fmt.Sprintf("⚠️ Channel <#%s> was not subscribed to the '%s' topic.", channelID, topicToRemove)
@@ -220,6 +249,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			responseMessage = fmt.Sprintf("✅ Unsubscribed channel <#%s> from the '%s' topic.", channelID, topicToRemove)
 			log.Printf("Subscription removed: Guild %s, Channel %s, Topic %s", guildID, channelID, topicToRemove)
 		}
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{

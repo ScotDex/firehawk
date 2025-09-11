@@ -4,6 +4,8 @@
 [![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?label=Support%20Server)](https://discord.gg/YOUR_INVITE_LINK)
 [![Status](https://img.shields.io/badge/status-probably%20broken-red.svg)](https://github.com/YOUR_USERNAME/firehawk)
 
+
+
 Another EVE Online Discord bot, because apparently there aren't enough already. This one is written in Golang (Cos I hate listening to tutorial videos, learn by building damn it), so at least it's fast. Inspired by the actually good [Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).
 
 ![Screenshot of the bot posting a killmail]

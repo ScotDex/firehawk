@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 )
@@ -22,13 +23,13 @@ type ESIClient struct {
 	contactInfo      string
 }
 
-func NewESIClient() *ESIClient {
+func NewESIClient(contactInfo string) *ESIClient {
 	return &ESIClient{
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
 		baseURL:   "https://esi.evetech.net/latest",
-		userAgent: fmt.Sprintf("Firehawk Discord Bot (%s)"),
+		userAgent: fmt.Sprintf("Firehawk Discord Bot (%s)", contactInfo),
 
 		characterNames:   make(map[int]string),
 		corporationNames: make(map[int]string),
@@ -97,18 +98,28 @@ func (c *ESIClient) GetSystemName(id int) string {
 	return c.getName(id, "universe/systems", c.systemNames)
 }
 
-// Add this struct to parse the JSON from the /search endpoint
-type EsiSearchCharacterResponse struct {
-	Character []int `json:"character"`
+// In esi_api.go
+
+// Your new, correct struct for the /universe/ids/ endpoint
+type EsiIDResponse struct {
+	Characters []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"characters"`
 }
 
-// Add this method to your ESIClient
+// GetCharacterID resolves a character name to its ID using the POST endpoint.
 func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
-	// Use url.QueryEscape to safely handle spaces and special characters in names
-	fullURL := fmt.Sprintf("%s/search/?categories=character&search=%s&strict=true", c.baseURL, url.QueryEscape(characterName))
+	log.Println("DEBUG: Looking up character ID for:", characterName)
+	requestBody, _ := json.Marshal([]string{characterName})
+	fullURL := fmt.Sprintf("%s/universe/ids", c.baseURL)
 
-	req, _ := http.NewRequest("GET", fullURL, nil)
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return 0, err
+	}
 	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -116,16 +127,19 @@ func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 	}
 	defer resp.Body.Close()
 
-	var searchData EsiSearchCharacterResponse
-	if err := json.NewDecoder(resp.Body).Decode(&searchData); err != nil {
-		return 0, fmt.Errorf("failed to decode character search response")
+	log.Printf("DEBUG: ESI responded with HTTP Status: %s", resp.Status)
+
+	// Use your new, correct struct here
+	var idData EsiIDResponse
+	if err := json.NewDecoder(resp.Body).Decode(&idData); err != nil {
+		return 0, fmt.Errorf("failed to decode ID response")
 	}
 
-	// Check if the search returned any results
-	if len(searchData.Character) == 0 {
+	// Check if the response contains any character data
+	if idData.Characters == nil || len(idData.Characters) == 0 {
 		return 0, fmt.Errorf("character not found: %s", characterName)
 	}
 
-	// Return the first ID found
-	return searchData.Character[0], nil
+	// Return the ID of the first character found
+	return idData.Characters[0].ID, nil
 }

@@ -29,7 +29,7 @@ func main() {
 	}
 
 	log.Println("Bot token loaded successfully")
-	esiClient = NewESIClient()
+	esiClient = NewESIClient("themadlyscientific@gmail.com")
 	if err := esiClient.LoadCacheFromFile(cacheFilePath); err != nil {
 		log.Printf("Warning: could not load ESI cache: %v", err)
 	}
