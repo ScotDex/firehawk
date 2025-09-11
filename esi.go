@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -20,6 +21,7 @@ type ESIClient struct {
 	corporationNames map[int]string
 	shipNames        map[int]string
 	systemNames      map[int]string
+	systemInfoCache  map[int]*ESISystemInfo
 	cacheMutex       sync.RWMutex
 	contactInfo      string
 }
@@ -37,6 +39,7 @@ func NewESIClient(contactInfo string) *ESIClient {
 		shipNames:        make(map[int]string),
 		systemNames:      make(map[int]string),
 		characterIDs:     make(map[string]int),
+		systemInfoCache:  make(map[int]*ESISystemInfo),
 	}
 }
 
@@ -159,4 +162,84 @@ func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 
 	// Return the ID of the first character found
 	return fetchedID, nil
+}
+
+type ESISystemInfo struct {
+	Name           string  `json:"name"`
+	SecurityStatus float64 `json:"security_status"`
+	Stargates      []int   `json:"stargates"`
+	Stations       []int   `json:"stations"`
+	SystemID       int     `json:"system_id"`
+}
+
+// FIX: Added the struct for parsing the system search response.
+type EsiSearchSystemResponse struct {
+	SolarSystem []int `json:"solar_system"`
+}
+
+func (c *ESIClient) GetSystemInfo(systemID int) (*ESISystemInfo, error) {
+	// Check the cache first
+	c.cacheMutex.RLock()
+	info, found := c.systemInfoCache[systemID]
+	c.cacheMutex.RUnlock()
+	if found {
+		return info, nil // Cache HIT!
+	}
+
+	// Cache MISS, proceed with API call
+	fullURL := fmt.Sprintf("%s/universe/systems/%d/", c.baseURL, systemID)
+	req, _ := http.NewRequest("GET", fullURL, nil)
+	req.Header.Set("User-Agent", c.userAgent)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var systemData ESISystemInfo
+	if json.NewDecoder(resp.Body).Decode(&systemData) != nil {
+		return nil, fmt.Errorf("failed to decode system info")
+	}
+
+	// Save the new data to the cache
+	c.cacheMutex.Lock()
+	c.systemInfoCache[systemID] = &systemData
+	c.cacheMutex.Unlock()
+
+	return &systemData, nil
+}
+
+// In esi_api.go
+
+// Add this struct for parsing the system search response.
+type ESISearchSystemResponse struct {
+	SolarSystem []int `json:"solar_system"`
+}
+
+// GetSystemID finds a solar system's ID from its name.
+func (c *ESIClient) GetSystemID(systemName string) (int, error) {
+	fullURL := fmt.Sprintf("%s/search/?categories=solar_system&search=%s&strict=true", c.baseURL, url.QueryEscape(systemName))
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var searchData EsiSearchSystemResponse
+	if err := json.NewDecoder(resp.Body).Decode(&searchData); err != nil {
+		return 0, fmt.Errorf("failed to decode system search response")
+	}
+
+	if len(searchData.SolarSystem) == 0 {
+		return 0, fmt.Errorf("solar system not found: %s", systemName)
+	}
+
+	return searchData.SolarSystem[0], nil
 }

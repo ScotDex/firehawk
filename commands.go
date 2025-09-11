@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -12,7 +13,7 @@ import (
 
 var subscriptions = make(map[string]map[string][]string)
 
-// Define the choices once as a separate variable to be reused.
+// Global variable to re-use for subscribe/unsubscribe process.
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
 	{Name: "All Kills", Value: "all"},
 	{Name: "Big Kills", Value: "bigkills"},
@@ -43,7 +44,19 @@ var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
 var commands = []*discordgo.ApplicationCommand{
 	{
 		Name:        "status",
-		Description: "Live status of EVE Online server",
+		Description: "Live Tranquility Status",
+	},
+	{
+		Name:        "scout",
+		Description: "Provides intel on a specific solar system.",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "system_name",
+				Description: "The name of the solar system to scout.",
+				Required:    true,
+			},
+		},
 	},
 	{
 		Name:        "lookup",
@@ -52,14 +65,14 @@ var commands = []*discordgo.ApplicationCommand{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,
 				Name:        "character_name",
-				Description: "Name of the character to look up",
+				Description: "The name of the charachter you want to look up (I need precise spelling)",
 				Required:    true,
 			},
 		},
 	},
 	{
 		Name:        "subscribe",
-		Description: "Sub this channel to a killmail feed",
+		Description: "Subscribe this channel to a killmail feed of choice",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,
@@ -90,7 +103,7 @@ var commands = []*discordgo.ApplicationCommand{
 			{
 				Type:        discordgo.ApplicationCommandOptionChannel,
 				Name:        "channel",
-				Description: "The channel to unsubscribe (defaults to current)",
+				Description: "The channel to unsubscribe (defaults to the current channel)",
 				Required:    false,
 			},
 		},
@@ -107,7 +120,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		if err != nil {
 			log.Printf("Error fetching API status: %v", err)
 			s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-				Content: "❌ Error fetching EVE Online server status.",
+				Content: "Server possibly offline, or you are on a VPN...",
 			})
 			return
 		}
@@ -116,12 +129,23 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		uptimeStr := fmt.Sprintf("%d hours, %d minutes", int(uptime.Hours()), int(uptime.Minutes())%60)
 
 		embed := &discordgo.MessageEmbed{
-			Title: "EVE Online Server Status",
+			Author: &discordgo.MessageEmbedAuthor{
+				Name:    "Tranquility",
+				URL:     "https://esi.evetech.net/ui/",
+				IconURL: "https://web.ccpgamescdn.com/forums/img/eve_favicon.ico",
+			},
+			Title: "Server Status - Online",
 			Color: 0x00ff00,
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: fmt.Sprintf("https://images.evetech.net/corporations/%d/logo?size=128", getRandomCachedCorpLogo()),
+			},
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "Players Online", Value: fmt.Sprintf("%d", status.Players), Inline: true},
-				{Name: "Server Uptime", Value: uptimeStr, Inline: true},
-				{Name: "Server Version", Value: status.ServerVersion},
+				{Name: "Uptime", Value: uptimeStr, Inline: true},
+				{Name: "Version", Value: status.ServerVersion},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Powered by Firehawk",
 			},
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
@@ -135,28 +159,27 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"lookup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		// Defer the response to give us more time
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 		charName := i.ApplicationCommandData().Options[0].StringValue()
+
 		charID, err := esiClient.GetCharacterID(charName)
 		if err != nil {
 			log.Printf("Error looking up character ID for '%s': %v", charName, err)
-			errormmessage := fmt.Sprintf("❌ Error looking up character ID for '%s'.", charName)
+			errormessage := fmt.Sprintf("❌ Error looking up character ID for '%s'.", charName)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-				Content: &errormmessage,
+				Content: &errormessage,
 			})
 			return
 		}
 
 		finalURL := fmt.Sprintf("https://eve-kill.com/character/%d", charID)
-
 		embed := &discordgo.MessageEmbed{
-			Title:       fmt.Sprintf("View '%s' on EVE-KILL", charName),
-			Description: fmt.Sprintf("Direct killboard link for character ID: %d", charID),
-			URL:         finalURL, // This makes the Title a clickable link.
-			Color:       0x42b6f5, // Blue
+			Title:       "View on EVE-KILL",
+			Description: fmt.Sprintf("Killboard for %s", charName),
+			URL:         finalURL,
+			Color:       0x42b6f5,
 			Thumbnail: &discordgo.MessageEmbedThumbnail{
 				URL: fmt.Sprintf("https://images.evetech.net/characters/%d/portrait", charID),
 			},
@@ -176,7 +199,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		for _, opt := range options {
 			optionMap[opt.Name] = opt
 		}
-
 		topic := optionMap["topic"].StringValue()
 		var channelID string
 		if channelOption, ok := optionMap["channel"]; ok {
@@ -184,8 +206,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		} else {
 			channelID = i.ChannelID
 		}
-
 		guildID := i.GuildID
+
 		if _, ok := subscriptions[guildID]; !ok {
 			subscriptions[guildID] = make(map[string][]string)
 		}
@@ -196,7 +218,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		subscriptions[guildID][channelID] = append(subscriptions[guildID][channelID], topic)
 		log.Printf("New subscription added: Guild %s, Channel %s, Topic %s", guildID, channelID, topic)
 		responseMessage := fmt.Sprintf("✅ Subscribed channel <#%s> to the '%s' topic.", channelID, topic)
-
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -219,8 +240,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		} else {
 			channelID = i.ChannelID
 		}
-
 		guildID := i.GuildID
+
 		if _, ok := subscriptions[guildID][channelID]; !ok {
 			responseMessage := fmt.Sprintf("⚠️ This channel isn't subscribed to any topics.")
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -258,4 +279,73 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			},
 		})
 	},
+
+	"scout": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		})
+
+		systemName := i.ApplicationCommandData().Options[0].StringValue()
+
+		systemID, err := esiClient.GetSystemID(systemName)
+		if err != nil {
+			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &[]string{"❌ Could not find a solar system with that name."}[0],
+			})
+			return
+		}
+
+		systemInfo, err := esiClient.GetSystemInfo(systemID)
+		if err != nil {
+			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &[]string{"❌ Could not retrieve details for that system."}[0],
+			})
+			return
+		}
+
+		embed := &discordgo.MessageEmbed{
+			Title: "System Intel: " + systemInfo.Name,
+			Color: 0x42b6f5, // Blue
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Security Status",
+					Value:  fmt.Sprintf("%.1f", systemInfo.SecurityStatus),
+					Inline: true,
+				},
+				{
+					Name:   "Stargates",
+					Value:  fmt.Sprintf("%d", len(systemInfo.Stargates)),
+					Inline: true,
+				},
+				{
+					Name:   "Stations",
+					Value:  fmt.Sprintf("%d", len(systemInfo.Stations)),
+					Inline: true,
+				},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: fmt.Sprintf("System ID: %d", systemInfo.SystemID),
+			},
+		}
+
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Embeds: &[]*discordgo.MessageEmbed{embed},
+		})
+	},
+}
+
+func getRandomCachedCorpLogo() int {
+	esiClient.cacheMutex.RLock()
+	defer esiClient.cacheMutex.RUnlock()
+
+	if len(esiClient.corporationNames) == 0 {
+		return 1000001 // default to CONCORD as error handling
+	}
+	corpIDs := make([]int, 0, len(esiClient.corporationNames))
+	for id := range esiClient.corporationNames {
+		corpIDs = append(corpIDs, id)
+	}
+
+	randomIndex := rand.Intn(len(corpIDs))
+	return corpIDs[randomIndex]
 }
