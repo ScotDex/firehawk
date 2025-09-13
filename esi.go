@@ -1,52 +1,132 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 )
 
+// ESIClient holds the configuration for making ESI calls and the in-memory cache.
 type ESIClient struct {
 	httpClient *http.Client
 	baseURL    string
 	userAgent  string
 
+	// Caches for ID -> Name lookups
 	characterNames   map[int]string
 	corporationNames map[int]string
 	shipNames        map[int]string
 	systemNames      map[int]string
-	cacheMutex       sync.RWMutex
-	contactInfo      string
+	// Cache for Name -> ID lookups
+	characterIDs map[string]int
+	// Cache for detailed system info
+	systemInfoCache map[int]*ESISystemInfo
+	cacheMutex      sync.RWMutex
 }
 
-func NewESIClient() *ESIClient {
+// NewESIClient creates and configures a new ESI client.
+func NewESIClient(contactInfo string) *ESIClient {
 	return &ESIClient{
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-		baseURL:   "https://esi.evetech.net/latest",
-		userAgent: fmt.Sprintf("Firehawk Discord Bot (%s)"),
-
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+		baseURL:    "https://esi.evetech.net/latest",
+		userAgent:  fmt.Sprintf("Firehawk Discord Bot (%s)", contactInfo),
+		// Initialize all cache maps
 		characterNames:   make(map[int]string),
 		corporationNames: make(map[int]string),
 		shipNames:        make(map[int]string),
 		systemNames:      make(map[int]string),
+		characterIDs:     make(map[string]int),
+		systemInfoCache:  make(map[int]*ESISystemInfo),
 	}
 }
 
+// --- Struct Definitions ---
 type ESINameResponse struct {
 	Name string `json:"name"`
 }
+type EsiIDResponse struct {
+	Characters []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"characters"`
+}
+type ESISystemInfo struct {
+	Name           string  `json:"name"`
+	SecurityStatus float64 `json:"security_status"`
+	Stargates      []int   `json:"stargates"`
+	Stations       []int   `json:"stations"`
+	SystemID       int     `json:"system_id"`
+}
+type EsiSearchSystemResponse struct {
+	SolarSystem []int `json:"solar_system"`
+}
 
-// getName is a generic, internal helper function to resolve any ID to a name with caching.
+// --- CORE HELPER FUNCTION ---
+// makeRequest is a single, generic function to handle all ESI API calls.
+func (c *ESIClient) makeRequest(method, url string, body io.Reader, target interface{}) error {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	if method == "POST" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	log.Printf("DEBUG: ESI responded to %s with HTTP Status: %s", url, resp.Status)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ESI returned non-200 status: %s", resp.Status)
+	}
+
+	// Decode the JSON response directly into the provided target interface.
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+// --- NAME -> ID METHODS ---
+func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
+	// 1. Check cache
+	c.cacheMutex.RLock()
+	id, found := c.characterIDs[characterName]
+	c.cacheMutex.RUnlock()
+	if found {
+		return id, nil
+	}
+
+	// 2. API call on cache miss
+	requestBody, _ := json.Marshal([]string{characterName})
+	fullURL := fmt.Sprintf("%s/universe/ids/", c.baseURL)
+	var idData EsiIDResponse
+	if err := c.makeRequest("POST", fullURL, bytes.NewBuffer(requestBody), &idData); err != nil {
+		return 0, err
+	}
+	if idData.Characters == nil || len(idData.Characters) == 0 {
+		return 0, fmt.Errorf("character not found: %s", characterName)
+	}
+
+	// 3. Store result in cache and return
+	fetchedID := idData.Characters[0].ID
+	c.cacheMutex.Lock()
+	c.characterIDs[characterName] = fetchedID
+	c.cacheMutex.Unlock()
+	return fetchedID, nil
+}
+
+// --- ID -> NAME METHODS (Now much shorter) ---
 func (c *ESIClient) getName(id int, category string, cache map[int]string) string {
 	if id == 0 {
 		return "Unknown"
 	}
-	// 1. Check cache first (with a read lock)
 	c.cacheMutex.RLock()
 	name, found := cache[id]
 	c.cacheMutex.RUnlock()
@@ -54,83 +134,36 @@ func (c *ESIClient) getName(id int, category string, cache map[int]string) strin
 		return name
 	}
 
-	// 2. Not in cache, make API call
 	fullURL := fmt.Sprintf("%s/%s/%d/", c.baseURL, category, id)
-	req, _ := http.NewRequest("GET", fullURL, nil)
-	req.Header.Set("User-Agent", c.userAgent)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "Unknown"
-	}
-	defer resp.Body.Close()
-
 	var nameData ESINameResponse
-	if json.NewDecoder(resp.Body).Decode(&nameData) != nil {
+	if c.makeRequest("GET", fullURL, nil, &nameData) != nil {
 		return "Unknown"
 	}
 
-	// 3. Store result in cache (with a write lock)
 	c.cacheMutex.Lock()
 	cache[id] = nameData.Name
 	c.cacheMutex.Unlock()
-
 	return nameData.Name
 }
 
-// GetCharacterName resolves a character ID to a name.
 func (c *ESIClient) GetCharacterName(id int) string {
 	return c.getName(id, "characters", c.characterNames)
 }
-
-// GetCorporationName resolves a corporation ID to a name.
 func (c *ESIClient) GetCorporationName(id int) string {
 	return c.getName(id, "corporations", c.corporationNames)
 }
-
-// GetShipName resolves a ship type ID to a name.
 func (c *ESIClient) GetShipName(id int) string {
 	return c.getName(id, "universe/types", c.shipNames)
 }
-
-// GetSystemName resolves a solar system ID to a name.
 func (c *ESIClient) GetSystemName(id int) string {
 	return c.getName(id, "universe/systems", c.systemNames)
 }
 
-// Add this struct to parse the JSON from the /search endpoint
-type EsiSearchCharacterResponse struct {
-	Character []int `json:"character"`
-}
+//func (c *ESIClient) GetSystemID(id int) string {
+//	return c.getName(id, "universe/systems", c.systemNames)
+//}
+//func (c *ESIClient) GetSystemInfo(id int) string {
+//	return c.getName(id, "universe/systems", c.systemNames)
+//}
 
-// This is the only new method you need for the lookup command.
-func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
-	// Use url.QueryEscape to safely handle spaces and special characters in names
-	fullURL := fmt.Sprintf("%s/search/?categories=character&search=%s&strict=true", c.baseURL, url.QueryEscape(characterName))
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return 0, err
-	}
-
-	// Set the required User-Agent header
-	req.Header.Set("User-Agent", c.userAgent)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	var searchData EsiSearchCharacterResponse
-	if err := json.NewDecoder(resp.Body).Decode(&searchData); err != nil {
-		return 0, fmt.Errorf("failed to decode character search response")
-	}
-
-	// Check if the search returned any results
-	if len(searchData.Character) == 0 {
-		return 0, fmt.Errorf("character not found: %s", characterName)
-	}
-
-	// Return the first ID found
-	return searchData.Character[0], nil
-}
+// ... (Add GetSystemInfo and GetSystemID here, following the same pattern)

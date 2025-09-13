@@ -8,93 +8,31 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// You will also need a getAPIStatus() function and a global esiClient variable defined elsewhere.
+// You will also need getAPIStatus() and a global esiClient variable defined elsewhere.
 
 var subscriptions = make(map[string]map[string][]string)
 
-// Define the choices once as a separate variable to be reused.
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
-	{Name: "All Kills", Value: "all"},
-	{Name: "Big Kills", Value: "bigkills"},
-	{Name: "Solo Kills", Value: "solo"},
-	{Name: "NPC Kills", Value: "npc"},
-	{Name: "Citadel Kills", Value: "citadel"},
-	{Name: "10b+ ISK Kills", Value: "10b"},
-	{Name: "5b+ ISK Kills", Value: "5b"},
-	{Name: "Abyssal Kills", Value: "abyssal"},
-	{Name: "W-Space Kills", Value: "wspace"},
-	{Name: "High-sec Kills", Value: "highsec"},
-	{Name: "Low-sec Kills", Value: "lowsec"},
-	{Name: "Null-sec Kills", Value: "nullsec"},
-	{Name: "T1 Ship Kills", Value: "t1"},
-	{Name: "T2 Ship Kills", Value: "t2"},
-	{Name: "T3 Ship Kills", Value: "t3"},
-	{Name: "Frigate Kills", Value: "frigates"},
-	{Name: "Destroyer Kills", Value: "destroyers"},
-	{Name: "Cruiser Kills", Value: "cruisers"},
-	{Name: "Battlecruiser Kills", Value: "battlecruisers"},
-	{Name: "Battleship Kills", Value: "battleships"},
-	{Name: "Capital Kills", Value: "capitals"},
-	{Name: "Freighter Kills", Value: "freighters"},
-	{Name: "Supercarrier Kills", Value: "supercarriers"},
-	{Name: "Titan Kills", Value: "titans"},
+	{Name: "All Kills", Value: "all"}, {Name: "Big Kills", Value: "bigkills"},
+	{Name: "Solo Kills", Value: "solo"}, {Name: "NPC Kills", Value: "npc"},
+	{Name: "Citadel Kills", Value: "citadel"}, {Name: "10b+ ISK Kills", Value: "10b"},
+	{Name: "5b+ ISK Kills", Value: "5b"}, {Name: "Abyssal Kills", Value: "abyssal"},
+	{Name: "W-Space Kills", Value: "wspace"}, {Name: "High-sec Kills", Value: "highsec"},
+	{Name: "Low-sec Kills", Value: "lowsec"}, {Name: "Null-sec Kills", Value: "nullsec"},
+	{Name: "T1 Ship Kills", Value: "t1"}, {Name: "T2 Ship Kills", Value: "t2"},
+	{Name: "T3 Ship Kills", Value: "t3"}, {Name: "Frigate Kills", Value: "frigates"},
+	{Name: "Destroyer Kills", Value: "destroyers"}, {Name: "Cruiser Kills", Value: "cruisers"},
+	{Name: "Battlecruiser Kills", Value: "battlecruisers"}, {Name: "Battleship Kills", Value: "battleships"},
+	{Name: "Capital Kills", Value: "capitals"}, {Name: "Freighter Kills", Value: "freighters"},
+	{Name: "Supercarrier Kills", Value: "supercarriers"}, {Name: "Titan Kills", Value: "titans"},
 }
 
 var commands = []*discordgo.ApplicationCommand{
-	{
-		Name:        "status",
-		Description: "Live status of EVE Online server",
-	},
-	{
-		Name:        "lookup",
-		Description: "Lookup an EVE Online character by name",
-		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "character_name",
-				Description: "Name of the character to look up",
-				Required:    true,
-			},
-		},
-	},
-	{
-		Name:        "subscribe",
-		Description: "Sub this channel to a killmail feed",
-		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic",
-				Description: "The feed to subscribe to",
-				Required:    true,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionChannel,
-				Name:        "channel",
-				Description: "The channel to subscribe to",
-				Required:    false,
-			},
-		},
-	},
-	{
-		Name:        "unsubscribe",
-		Description: "Unsubscribe this channel from a killmail feed",
-		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic",
-				Description: "The feed to unsubscribe from",
-				Required:    true,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionChannel,
-				Name:        "channel",
-				Description: "The channel to unsubscribe (defaults to current)",
-				Required:    false,
-			},
-		},
-	},
+	{Name: "status", Description: "Live Tranquility Status"},
+	{Name: "scout", Description: "Provides intel on a specific solar system.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "system_name", Description: "The name of the solar system to scout.", Required: true}}},
+	{Name: "lookup", Description: "Lookup an EVE Online character by name", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "character_name", Description: "Name of the character (exact spelling required).", Required: true}}},
+	{Name: "subscribe", Description: "Subscribe this channel to a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to subscribe to", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to subscribe to", Required: false}}},
+	{Name: "unsubscribe", Description: "Unsubscribe this channel from a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to unsubscribe from", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to unsubscribe", Required: false}}},
 }
 
 var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
@@ -130,54 +68,23 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 	},
 
-	// In your commandHandlers map in commands.go
-
 	"lookup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		log.Println("--- /lookup command initiated ---")
-
-		// Defer the response immediately
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
-		if err != nil {
-			log.Printf("DEBUG: Failed to defer interaction: %v", err)
-			return
-		}
-
-		// Get the character name from the user's command
 		charName := i.ApplicationCommandData().Options[0].StringValue()
-		log.Printf("DEBUG: User is looking for character: '%s'", charName)
-
-		// Use your ESI client to get the character's ID
-		log.Println("DEBUG: Calling esiClient.GetCharacterID...")
 		charID, err := esiClient.GetCharacterID(charName)
-
-		// Check for an error from the ESI call
 		if err != nil {
-			log.Printf("DEBUG: esiClient returned an error: %v", err)
 			errorMessage := fmt.Sprintf("❌ Could not find a character named `%s`.", charName)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 				Content: &errorMessage,
 			})
 			return
 		}
-
-		// If successful, log the result
-		log.Printf("DEBUG: Found Character ID: %d", charID)
-
-		// Build the final URL using the ID
 		finalURL := fmt.Sprintf("https://eve-kill.com/character/%d", charID)
-		log.Printf("DEBUG: Constructed final URL: %s", finalURL)
-
-		// Send the URL as the response
-		_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: &finalURL,
 		})
-		if err != nil {
-			log.Printf("DEBUG: Failed to edit interaction response: %v", err)
-		}
-
-		log.Println("--- /lookup command finished ---")
 	},
 
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {

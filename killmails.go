@@ -122,11 +122,11 @@ func killmailPoller(s *discordgo.Session, channelID string) {
 		}
 
 		// --- 3. Filter out old killmails (currently commented out for testing) ---
-		// killTime := killmailData.Package.Killmail.KillmailTime
-		// if time.Since(killTime) > 5*time.Minute {
-		// 	log.Printf("Stale killmail (ID %d) received, skipping...\n", killmailData.Package.KillID)
-		// 	continue
-		// }
+		killTime := killmailData.Package.Killmail.KillmailTime
+		if time.Since(killTime) > 5*time.Minute {
+			log.Printf("Stale killmail (ID %d) received, skipping...\n", killmailData.Package.KillID)
+			continue
+		}
 
 		log.Printf("New killmail received: ID %d in system %d\n", killmailData.Package.KillID, killmailData.Package.Killmail.SolarSystemID)
 
