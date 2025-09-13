@@ -9,3 +9,6 @@ Add AI connection?
 Dad Joke API
 Integrate enviroment file better?
 Static Data
+Help function
+Broadcast function?
+Tools function?
