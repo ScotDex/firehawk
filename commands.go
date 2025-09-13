@@ -130,23 +130,54 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 	},
 
+	// In your commandHandlers map in commands.go
+
 	"lookup": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		log.Println("--- /lookup command initiated ---")
+
+		// Defer the response immediately
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
-		charName := i.ApplicationCommandData().Options[0].StringValue()
-		charID, err := esiClient.GetCharacterID(charName)
 		if err != nil {
+			log.Printf("DEBUG: Failed to defer interaction: %v", err)
+			return
+		}
+
+		// Get the character name from the user's command
+		charName := i.ApplicationCommandData().Options[0].StringValue()
+		log.Printf("DEBUG: User is looking for character: '%s'", charName)
+
+		// Use your ESI client to get the character's ID
+		log.Println("DEBUG: Calling esiClient.GetCharacterID...")
+		charID, err := esiClient.GetCharacterID(charName)
+
+		// Check for an error from the ESI call
+		if err != nil {
+			log.Printf("DEBUG: esiClient returned an error: %v", err)
 			errorMessage := fmt.Sprintf("❌ Could not find a character named `%s`.", charName)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 				Content: &errorMessage,
 			})
 			return
 		}
+
+		// If successful, log the result
+		log.Printf("DEBUG: Found Character ID: %d", charID)
+
+		// Build the final URL using the ID
 		finalURL := fmt.Sprintf("https://eve-kill.com/character/%d", charID)
-		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		log.Printf("DEBUG: Constructed final URL: %s", finalURL)
+
+		// Send the URL as the response
+		_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: &finalURL,
 		})
+		if err != nil {
+			log.Printf("DEBUG: Failed to edit interaction response: %v", err)
+		}
+
+		log.Println("--- /lookup command finished ---")
 	},
 
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {

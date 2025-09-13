@@ -102,12 +102,17 @@ type EsiSearchCharacterResponse struct {
 	Character []int `json:"character"`
 }
 
-// Add this method to your ESIClient
+// This is the only new method you need for the lookup command.
 func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 	// Use url.QueryEscape to safely handle spaces and special characters in names
 	fullURL := fmt.Sprintf("%s/search/?categories=character&search=%s&strict=true", c.baseURL, url.QueryEscape(characterName))
 
-	req, _ := http.NewRequest("GET", fullURL, nil)
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	// Set the required User-Agent header
 	req.Header.Set("User-Agent", c.userAgent)
 
 	resp, err := c.httpClient.Do(req)

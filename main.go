@@ -14,7 +14,7 @@ import (
 
 var esiClient *ESIClient
 
-const targetChannelID = "1414750324169900114"
+const targetChannelID = "1415431475368693823"
 const cacheFilePath = "esi_cache.json"
 
 func main() {
