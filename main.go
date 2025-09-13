@@ -1,5 +1,3 @@
-// preliminary name - firehawk?
-
 package main
 
 import (

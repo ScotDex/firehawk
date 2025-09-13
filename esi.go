@@ -114,7 +114,7 @@ func (c *ESIClient) GetCharacterID(characterName string) (int, error) {
 	if err := c.makeRequest("POST", fullURL, bytes.NewBuffer(requestBody), &idData); err != nil {
 		return 0, err
 	}
-	if idData.Characters == nil || len(idData.Characters) == 0 {
+	if len(idData.Characters) == 0 {
 		return 0, fmt.Errorf("character not found: %s", characterName)
 	}
 
