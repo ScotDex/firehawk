@@ -1,8 +1,0 @@
-Core Feature Task List
-
-Group Lookup: Looks up information about EVE corporations and alliances.
-
-Location Scout: Provides detailed information about a specific solar system.
-
-Price: Checks the market price for items in-game - Requires upgrade in infrastructure to achieve effectively.
-

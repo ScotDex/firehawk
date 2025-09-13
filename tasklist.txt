@@ -1,0 +1,11 @@
+
+Price: Checks the market price for items in-game - Requires upgrade in infrastructure to achieve effectively?
+Add go routines to esi client to improve performance.
+Refine embeds for better presentation
+add function to rotate through corp logos
+Add some additional error handling
+SDE?
+Add AI connection?
+Dad Joke API
+Integrate enviroment file better?
+Static Data

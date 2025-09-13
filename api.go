@@ -145,32 +145,27 @@ type EntityCounts struct {
 	Characters   int `json:"characters"`
 }
 
-func performSearch(SearchTerm string) (*SearchResponse, error) {
+// Centralized function to utilize search
 
-	baseUrl := "https://eve-kill.com/api/search/"
-	fullURL := baseUrl + url.PathEscape(SearchTerm)
-
-	resp, err := http.Get(fullURL)
+func performSearch(searchTerm string) (*SearchResponse, error) {
+	// Use a Read Lock for checking, which is more efficient if multiple searches happen at once.
+	baseURL := "https://eve-kill.com/api/search/"
+	fullURL := baseURL + url.PathEscape(searchTerm)
+	resp, err := http.Get(fullURL) //nolint:bodyclose // Body is closed in defer
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("failed to make search request: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("failed to read search response body: %w", err)
 	}
 
-	var searchResult SearchResponse
-	if err := json.Unmarshal(body, &searchResult); err != nil {
-		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
+	var apiResult SearchResponse
+	if err := json.Unmarshal(body, &apiResult); err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
 	}
-
-	return &searchResult, nil
+	return &apiResult, nil
 }
 
 func findSystemInResults(response *SearchResponse) (Hit, error) {
@@ -185,4 +180,32 @@ func findSystemInResults(response *SearchResponse) (Hit, error) {
 
 	// If the loop finishes without finding a system, return an empty Hit and an error.
 	return Hit{}, fmt.Errorf("no system found in search results")
+}
+
+func findGroupInResults(response *SearchResponse) (Hit, error) {
+	// Loop through each hit in the response's Hits slice.
+	for _, hit := range response.Hits {
+		// Check if the type is "system".
+		if hit.Type == "corporations" {
+			// If it is, we found our match. Return the hit and no error.
+			return hit, nil
+		}
+	}
+
+	// If the loop finishes without finding a system, return an empty Hit and an error.
+	return Hit{}, fmt.Errorf("no corporations found in search results")
+}
+
+func findAllianceInResults(response *SearchResponse) (Hit, error) {
+	// Loop through each hit in the response's Hits slice.
+	for _, hit := range response.Hits {
+		// Check if the type is "system".
+		if hit.Type == "alliances" {
+			// If it is, we found our match. Return the hit and no error.
+			return hit, nil
+		}
+	}
+
+	// If the loop finishes without finding a system, return an empty Hit and an error.
+	return Hit{}, fmt.Errorf("no alliances found in search results")
 }

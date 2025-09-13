@@ -25,23 +25,25 @@ type ESIClient struct {
 	// Cache for Name -> ID lookups
 	characterIDs map[string]int
 	// Cache for detailed system info
-	systemInfoCache map[int]*ESISystemInfo
-	cacheMutex      sync.RWMutex
+
+	cacheMutex    sync.RWMutex
+	searchResults map[string]SearchResponse
 }
 
 // NewESIClient creates and configures a new ESI client.
 func NewESIClient(contactInfo string) *ESIClient {
+
 	return &ESIClient{
-		httpClient: &http.Client{Timeout: 15 * time.Second},
-		baseURL:    "https://esi.evetech.net/latest",
-		userAgent:  fmt.Sprintf("Firehawk Discord Bot (%s)", contactInfo),
-		// Initialize all cache maps
+		httpClient:       &http.Client{Timeout: 15 * time.Second},
+		baseURL:          "https://esi.evetech.net/latest",
+		userAgent:        fmt.Sprintf("Firehawk Discord Bot (%s)", contactInfo),
 		characterNames:   make(map[int]string),
 		corporationNames: make(map[int]string),
 		shipNames:        make(map[int]string),
 		systemNames:      make(map[int]string),
 		characterIDs:     make(map[string]int),
-		systemInfoCache:  make(map[int]*ESISystemInfo),
+
+		searchResults: make(map[string]SearchResponse),
 	}
 }
 
@@ -74,6 +76,7 @@ func (c *ESIClient) makeRequest(method, url string, body io.Reader, target inter
 		return err
 	}
 	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Accept-Encoding", "gzip")
 	if method == "POST" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -158,12 +161,3 @@ func (c *ESIClient) GetShipName(id int) string {
 func (c *ESIClient) GetSystemName(id int) string {
 	return c.getName(id, "universe/systems", c.systemNames)
 }
-
-//func (c *ESIClient) GetSystemID(id int) string {
-//	return c.getName(id, "universe/systems", c.systemNames)
-//}
-//func (c *ESIClient) GetSystemInfo(id int) string {
-//	return c.getName(id, "universe/systems", c.systemNames)
-//}
-
-// ... (Add GetSystemInfo and GetSystemID here, following the same pattern)
