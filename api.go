@@ -41,10 +41,11 @@ func getAPIStatus() (*ServerStatus, error) {
 }
 
 type cacheData struct {
-	CharacterNames   map[int]string `json:"characterNames"`
-	CorporationNames map[int]string `json:"corporationNames"`
-	ShipNames        map[int]string `json:"shipNames"`
-	SystemNames      map[int]string `json:"systemNames"`
+	CharacterNames   map[int]string         `json:"characterNames"`
+	CorporationNames map[int]string         `json:"corporationNames"`
+	ShipNames        map[int]string         `json:"shipNames"`
+	SystemNames      map[int]string         `json:"systemNames"`
+	SystemInfoCache  map[int]*ESISystemInfo `json:"systemInfoCache"`
 }
 
 // SaveCacheToFile saves the ESI client's in-memory cache to a JSON file.
@@ -58,6 +59,7 @@ func (c *ESIClient) SaveCacheToFile(filePath string) error {
 		CorporationNames: c.corporationNames,
 		ShipNames:        c.shipNames,
 		SystemNames:      c.systemNames,
+		SystemInfoCache:  c.systemInfoCache,
 	}
 
 	// Marshal the data into a nicely formatted JSON byte slice.
@@ -102,6 +104,7 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 	c.corporationNames = data.CorporationNames
 	c.shipNames = data.ShipNames
 	c.systemNames = data.SystemNames
+	c.systemInfoCache = data.SystemInfoCache
 
 	log.Println("Successfully loaded ESI cache from", filePath)
 	return nil
