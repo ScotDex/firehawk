@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -35,6 +36,7 @@ var commands = []*discordgo.ApplicationCommand{
 	{Name: "unsubscribe", Description: "Unsubscribe this channel from a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to unsubscribe from", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to unsubscribe", Required: false}}},
 	{Name: "alliance", Description: "Provides intel on a specific alliance.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "alliances", Description: "The name of an alliance you want to scout.", Required: true}}},
 	{Name: "group", Description: "Provides intel on a specific corporation.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "corporations", Description: "The name of a corporation you want to scout.", Required: true}}},
+	{Name: "tools", Description: "An up to date list of third party tools for Eve Online"},
 }
 var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 	"status": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -122,6 +124,34 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			Data: &discordgo.InteractionResponseData{
 				Content: responseMessage,
 			},
+		})
+	},
+
+	"tools": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		toolLinks := []string{
+			"[EVE-KILL](https://eve-kill.com/)",
+			"[Z-Kill](https://zkillboard.com/)",
+		}
+
+		// You will need to import the "strings" package for this to work.
+		var description strings.Builder
+		for _, link := range toolLinks {
+			description.WriteString(fmt.Sprintf("• %s\n", link))
+		}
+
+		// First, create the complete embed.
+		embed := &discordgo.MessageEmbed{
+			Title:       "EVE Community Tools",
+			Description: description.String(),
+			Color:       0x1a81ab,
+		}
+
+		// Then, send the response containing the embed.
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Embeds: []*discordgo.MessageEmbed{embed},
+			}, // <-- The missing '}' was here.
 		})
 	},
 
