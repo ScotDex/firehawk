@@ -23,7 +23,8 @@ type ESIClient struct {
 	shipNames        map[int]string
 	systemNames      map[int]string
 	// Cache for Name -> ID lookups
-	characterIDs map[string]int
+	characterIDs    map[string]int
+	systemInfoCache map[int]*ESISystemInfo
 	// Cache for detailed system info
 
 	cacheMutex    sync.RWMutex
@@ -42,8 +43,8 @@ func NewESIClient(contactInfo string) *ESIClient {
 		shipNames:        make(map[int]string),
 		systemNames:      make(map[int]string),
 		characterIDs:     make(map[string]int),
-
-		searchResults: make(map[string]SearchResponse),
+		systemInfoCache:  make(map[int]*ESISystemInfo),
+		searchResults:    make(map[string]SearchResponse),
 	}
 }
 
@@ -160,4 +161,33 @@ func (c *ESIClient) GetShipName(id int) string {
 }
 func (c *ESIClient) GetSystemName(id int) string {
 	return c.getName(id, "universe/systems", c.systemNames)
+}
+
+// GetSystemDetails fetches detailed information for a specific system, using a cache.
+func (c *ESIClient) GetSystemDetails(systemID int) (*ESISystemInfo, error) {
+	// 1. Check the cache first.
+	c.cacheMutex.RLock()
+	cachedInfo, found := c.systemInfoCache[systemID]
+	c.cacheMutex.RUnlock()
+
+	if found {
+		log.Printf("Cache HIT for system details: %d", systemID)
+		return cachedInfo, nil
+	}
+
+	log.Printf("Cache MISS for system details: %d. Calling ESI.", systemID)
+
+	// 2. API call on cache miss. Reuses your generic makeRequest function.
+	fullURL := fmt.Sprintf("%s/universe/systems/%d/", c.baseURL, systemID)
+	var apiResult ESISystemInfo
+	if err := c.makeRequest("GET", fullURL, nil, &apiResult); err != nil {
+		return nil, err
+	}
+
+	// 3. Store the new result in the cache.
+	c.cacheMutex.Lock()
+	c.systemInfoCache[systemID] = &apiResult
+	c.cacheMutex.Unlock()
+
+	return &apiResult, nil
 }
