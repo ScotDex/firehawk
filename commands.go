@@ -166,4 +166,60 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			},
 		})
 	},
+	"scout": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		// 1. Defer the response so Discord knows we're working on it.
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		})
+
+		// 2. Get the system name from the user's input.
+		options := i.ApplicationCommandData().Options
+		systemName := options[0].StringValue()
+
+		// 3. Call your API search function.
+		searchResult, err := performSearch(systemName)
+		if err != nil {
+			log.Printf("Error performing search for '%s': %v", systemName, err)
+			errorMessage := "❌ An error occurred while contacting the search API."
+			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &errorMessage,
+			})
+			return
+		}
+
+		// 4. Filter the results to find the system.
+		// (This assumes you have the findSystemInResults function we discussed)
+		systemHit, err := findSystemInResults(searchResult)
+		if err != nil {
+			// This error means a system wasn't found in the results.
+			errorMessage := fmt.Sprintf("❌ Could not find a system named `%s`.", systemName)
+			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &errorMessage,
+			})
+			return
+		}
+
+		// 5. Format a nice reply with an embed.
+		// (You can add more fields here later, like security status, region, etc.)
+		embed := &discordgo.MessageEmbed{
+			Title: fmt.Sprintf("Intel Report: %s", systemHit.Name),
+			Color: 0x00bfff, // A nice blue color
+			Fields: []*discordgo.MessageEmbedField{
+				{Name: "System Name", Value: systemHit.Name, Inline: true},
+				{Name: "System ID", Value: fmt.Sprintf("%d", systemHit.ID), Inline: true},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Source: EVE-KILL Search API",
+			},
+			Timestamp: time.Now().Format(time.RFC3339),
+		}
+
+		// 6. Send the final message.
+		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		})
+		if err != nil {
+			log.Printf("Failed to send scout followup message: %v", err)
+		}
+	},
 }

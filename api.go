@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -104,4 +105,84 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 
 	log.Println("Successfully loaded ESI cache from", filePath)
 	return nil
+}
+
+// SearchResponse is the top-level object for the entire API response.
+type SearchResponse struct {
+	Hits               []Hit        `json:"hits"`
+	Query              string       `json:"query"`
+	ProcessingTimeMs   int          `json:"processingTimeMs"`
+	Limit              int          `json:"limit"`
+	Offset             int          `json:"offset"`
+	EstimatedTotalHits int          `json:"estimatedTotalHits"`
+	EntityCounts       EntityCounts `json:"entityCounts"`
+	EntityOrder        []string     `json:"entityOrder"`
+	IsExactMatch       bool         `json:"isExactMatch"`
+}
+
+// Hit represents a single item within the search results.
+type Hit struct {
+	ID         int       `json:"id"`
+	Name       string    `json:"name"`
+	Type       string    `json:"type"`
+	Rank       int       `json:"rank"`
+	Lang       string    `json:"lang"`
+	Deleted    bool      `json:"deleted,omitempty"`
+	UpdatedAt  time.Time `json:"updatedAt,omitempty"`
+	Ticker     string    `json:"ticker,omitempty"`
+	LastActive time.Time `json:"last_active,omitempty"`
+}
+
+// EntityCounts holds the breakdown of hits per category.
+type EntityCounts struct {
+	Items        int `json:"items"`
+	Ships        int `json:"ships"`
+	Alliances    int `json:"alliances"`
+	Corporations int `json:"corporations"`
+	Factions     int `json:"factions"`
+	Systems      int `json:"systems"`
+	Regions      int `json:"regions"`
+	Characters   int `json:"characters"`
+}
+
+func performSearch(SearchTerm string) (*SearchResponse, error) {
+
+	baseUrl := "https://eve-kill.com/api/search/"
+	fullURL := baseUrl + url.PathEscape(SearchTerm)
+
+	resp, err := http.Get(fullURL)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	var searchResult SearchResponse
+	if err := json.Unmarshal(body, &searchResult); err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
+	}
+
+	return &searchResult, nil
+}
+
+func findSystemInResults(response *SearchResponse) (Hit, error) {
+	// Loop through each hit in the response's Hits slice.
+	for _, hit := range response.Hits {
+		// Check if the type is "system".
+		if hit.Type == "system" {
+			// If it is, we found our match. Return the hit and no error.
+			return hit, nil
+		}
+	}
+
+	// If the loop finishes without finding a system, return an empty Hit and an error.
+	return Hit{}, fmt.Errorf("no system found in search results")
 }
