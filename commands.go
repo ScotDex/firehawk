@@ -151,10 +151,14 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 
 		// First, create the complete embed.
+		corpLogoURL := esiClient.GetRandomCorporationLogoURL()
 		embed := &discordgo.MessageEmbed{
 			Title:       "EVE Community Tools",
 			Description: description.String(),
 			Color:       0x1a81ab,
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: corpLogoURL,
+			},
 		}
 
 		// Then, send the response containing the embed.
