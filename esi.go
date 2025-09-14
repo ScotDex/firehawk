@@ -221,27 +221,6 @@ func (c *ESIClient) GetSystemDetails(id int) (*ESISystemInfo, error) {
 	return nil, fmt.Errorf("system ID %d not found", id)
 }
 
-// --- PATCH: Fix missing region_ids in system cache using ESI API ---
-func (c *ESIClient) GetRegionIDs() error {
-	c.cacheMutex.Lock()
-	defer c.cacheMutex.Unlock()
-	for id, sys := range c.systemInfoCache {
-		if sys.RegionID == 0 {
-			apiSys := ESISystemInfo{}
-			url := fmt.Sprintf("%s/universe/systems/%d/", c.baseURL, id)
-			err := c.makeRequest(http.MethodGet, url, nil, &apiSys)
-			if err != nil {
-				log.Printf("Could not fetch region_id for system %d: %v", id, err)
-				continue
-			}
-			sys.RegionID = apiSys.RegionID
-			c.systemInfoCache[id] = sys
-			log.Printf("Patched region_id for system %d: now %d", id, sys.RegionID)
-		}
-	}
-	return nil
-}
-
 // --- Misc ---
 func (c *ESIClient) GetRandomCorporationLogoURL() string {
 	c.cacheMutex.RLock()

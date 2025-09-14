@@ -1,80 +1,73 @@
-# Firehawk Bot 🔥 (DONT SELF HOST YET!)
+# Firehawk Bot 🔥  
+**(Don’t self-host yet, seriously!)**
 
-[![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
-[![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?label=Support%20Server)](https://discord.gg/tas2ggVUr3)
-[![Status](https://img.shields.io/badge/status-probably%20broken-red.svg)](https://github.com/ScotDex/firehawk)
-
-
-
-Another EVE Online Discord bot, because apparently there aren't enough already. This one is badly written in Golang (Cos I hate listening to tutorial videos, learn by building damn it) but the positive is that the language is designed to be fast, so if you see lag at any point its most likely due to discord unable to keep up. Inspired by the actually good [Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).
-
-Please dont try and self host just yet, as this is still in a testing phase.
-
-*(A screenshot proving it occasionally works)*
-
-<img width="480" height="204" alt="image" src="https://github.com/user-attachments/assets/a6d42196-813f-444e-9701-85b94d3d99cc" />
+[![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)  
+[![Discord](https://img.shields.io/discord/YOUR_SERVER_ID?label=Support%20Server)](https://discord.gg/tas2ggVUr3)  
+[![Status](https://img.shields.io/badge/status-probably%20broken-red.svg)](https://github.com/ScotDex/firehawk)  
 
 ---
 
-## ✨ Features (The Things It Does)
+## 📖 What Is This?
+Another EVE Online Discord bot—because apparently there aren’t enough already.  
 
-* **Killmail Spam**: Get real-time killmails from `eve-kill.com` piped directly into your channel of choice.
-* **Endless Filtering**: Use the ridiculously long list of subscription topics to pretend you're only getting the "important" kills.
-* **Mostly Correct Data**: Fetches and caches names for things so you don't have to remember what ID `30000142` is.
-* **Server Status**: Tells you if Tranquility is online, so you know who to blame when you can't log in.
-* **Character Lookup**: Look up a name and get their killboard.
-* **Location Scout**: Get some information on the location you are about to visit for you to ignore and get killed by. (not finished yet)
+Written badly in **Go** (because I refuse to watch tutorial videos and prefer to learn by building), but the upside is: Go is fast. So if you notice lag, it’s probably Discord, not me.  
+
+Inspired by the *actually good* [Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).  
+
+⚠️ **Don’t try to self-host this yet**. It’s still in a testing phase.  
+
+*(Proof it sometimes works)*  
+<img width="480" height="204" alt="image" src="https://github.com/user-attachments/assets/a6d42196-813f-444e-9701-85b94d3d99cc" />  
+
 ---
 
-## 🚀 Commands (The Buttons You Can Press)
+## ✨ Features
+- **Killmail Spam** → Real-time killmails from `eve-kill.com` piped into your channel.  
+- **Endless Filtering** → Subscribe to specific killmail topics so you can pretend you only see the “important” ones.  
+- **Mostly Correct Data** → Fetches & caches IDs so you don’t have to remember what `30000142` is.  
+- **Server Status** → Tells you if Tranquility is alive.  
+- **Character Lookup** → Pulls a character’s killboard info.  
+- **Location Scout** → Info on systems before you blindly jump in (WIP).  
 
-It's a slash command bot. You know the drill.
+---
 
-| Command                             | Description                                            | Example                               |
-| ----------------------------------- | ------------------------------------------------------ | ------------------------------------- |
-| `/status`                           | Checks if the server hamster is still running.         | `/status`                             |
-| `/lookup <character_name>`          | Finds a character's public record of shame.            | `/lookup The Mittani`                 |
-| `/subscribe <topic> [channel]`      | Starts the spam of killmails in a channel.         | `/subscribe topic:Big Kills`          |
-| `/unsubscribe <topic> [channel]`    | Mercifully stops the spam.                         | `/unsubscribe topic:All Kills`        |
+## 🚀 Commands
+Slash commands only. You know the drill.  
+
+| Command                          | Description                                | Example                          |
+| -------------------------------- | ------------------------------------------ | -------------------------------- |
+| `/status`                        | Checks if the TQ hamster is alive.         | `/status`                        |
+| `/lookup <character_name>`       | Shows a character’s public record of shame.| `/lookup The Mittani`            |
+| `/subscribe <topic> [channel]`   | Starts killmail spam in a channel.         | `/subscribe topic:Big Kills`     |
+| `/unsubscribe <topic> [channel]` | Stops the spam (mercifully).               | `/unsubscribe topic:All Kills`   |
 
 ---
 
 ## 🔗 How to Get It
+It’s a **public bot**. No building required—just invite it and pray.  
 
-It's a public bot. You don't build it, you just invite it and hope for the best.
+### Quick Invite Link
+👉 [**Invite Firehawk to Your Server**](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot%20applications.commands&permissions=8)  
+
+*(Replace `YOUR_CLIENT_ID` with the bot’s actual client ID.)*  
 
 ---
 
-## 🗺️ Development Roadmap
-
-A list of things I'll probably get around to building eventually.
-
-### In Progress
-* `/price <item_name>`: So you can be disappointed by market prices without logging in.
-* `/scout <system_name>`: Get intel on a solar system.
-* `/group <name>`: Look up corps and alliances.
-
-### Planned
-* Group Lookup: Looks up information about EVE corporations and alliances.
-* Price: Checks the market price for items in-game.
-* Whatever else I feel like doing 
-* Dad Joke API - because why not?
-* Weather API because, global warming means its sunny in december these days...
-
-Add go routines to esi client to improve performance.
-Refine embeds for better presentation
-Add AI connection?
-Dad Joke API
-Integrate enviroment file better?
-Static Data
-Help function
-Broadcast function?
-
+## 🛠️ Roadmap / TODO
+- Add **goroutines** to ESI client for performance.  
+- Refine **embeds** for better presentation.  
+- Add **AI connection?** 🤔  
+- Dad Joke API (because why not).  
+- Weather API (because it’s somehow sunny in December).  
+- Better `.env` integration.  
+- Static data improvements.  
+- Help function.  
+- Broadcast function.  
+- Market price lookup command.  
 
 ---
 
 ## ❤️ Acknowledgements
-
-* This bot stands on the shoulders of giants, mostly the **[Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283)**.
-* Killmail data is graciously provided by the endless stream at **[Eve-Kill.com](https://eve-kill.com/)**.
-* Game data comes from the **EVE Online ESI API**, when it's working.
+- Inspired by the legendary [**Firetail Bot**](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).  
+- Killmail data from **[Eve-Kill.com](https://eve-kill.com/)**.  
+- Game data from the **EVE Online ESI API** (when it feels like working).  
