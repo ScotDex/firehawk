@@ -32,6 +32,9 @@ WORKDIR /app
 COPY --from=builder /app/firehawk .
 COPY .env .
 
+COPY esi_cache.json .
+COPY systems.json .
+
 # (Optional) If you were using a local cache file, you would copy it here too.
 # COPY esi_cache.json .
 
