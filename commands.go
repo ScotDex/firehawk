@@ -241,7 +241,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// 4. Filter the results to find the system.
 		// (This assumes you have the findSystemInResults function we discussed)
-		systemHit, err := findHitByType(searchResult, "systems")
+		systemHit, err := findHitByType(searchResult, "system")
 		if err != nil {
 			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find a system named `%s`.", systemName)
