@@ -2,11 +2,9 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -16,12 +14,12 @@ import (
 var esiClient *ESIClient
 
 // Create one shared client for the entire application to use.
-var sharedHttpClient = &http.Client{
-	Timeout: 15 * time.Second,
-	Transport: &http.Transport{
-		DisableCompression: false, // Enable Gzip
-	},
-}
+//var sharedHttpClient = &http.Client{
+//	Timeout: 15 * time.Second,
+//	Transport: &http.Transport{
+//		DisableCompression: false, // Enable Gzip
+//	},
+//}
 
 const cacheFilePath = "esi_cache.json"
 const systemCachePath = "systems.json" // Renamed for clarity

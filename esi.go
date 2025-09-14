@@ -260,7 +260,7 @@ func getSecStatusColor(securityStatus float64) int {
 	sec := float64(int(securityStatus*10)) / 10 // round 1 decimal
 	switch {
 	case sec >= 0.5:
-		return 0x00bfff // High-sec
+		return 0x00ff00 // High-sec
 	case sec > 0.0:
 		return 0xffa500 // Low-sec
 	default:
