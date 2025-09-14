@@ -15,27 +15,29 @@ type ServerStatus struct {
 	Players       int       `json:"players"`
 	ServerVersion string    `json:"server_version"`
 	StartTime     time.Time `json:"start_time"`
+	VIP           bool      `json:"vip,omitempty"`
 }
 
-func getAPIStatus() (*ServerStatus, error) {
-	resp, err := http.Get("https://esi.evetech.net/status?players&server_version&start_time?datasource=tranquility")
+// getAPIStatus is now a method on ESIClient to ensure it uses the correct HTTP client.
+func (c *ESIClient) getAPIStatus() (*ServerStatus, error) {
+	resp, err := c.httpClient.Get("https://esi.evetech.net/latest/status/?datasource=tranquility&vip")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to make ESI status request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("ESI status endpoint returned a non-200 status: %s", resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading ESI status response body: %w", err)
 	}
 
 	var status ServerStatus
 	if err := json.Unmarshal(body, &status); err != nil {
-		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
+		return nil, fmt.Errorf("error unmarshaling ESI status JSON: %w", err)
 	}
 	return &status, nil
 }
@@ -50,7 +52,6 @@ type cacheData struct {
 
 // SaveCacheToFile saves the ESI client's in-memory cache to a JSON file.
 func (c *ESIClient) SaveCacheToFile(filePath string) error {
-	// Lock the mutex to ensure no other part of the program can change the maps while we save.
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
 
@@ -62,16 +63,14 @@ func (c *ESIClient) SaveCacheToFile(filePath string) error {
 		SystemInfoCache:  c.systemInfoCache,
 	}
 
-	// Marshal the data into a nicely formatted JSON byte slice.
 	jsonData, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal cache data: %w", err)
+		return fmt.Errorf("failed to marshal cache data for saving: %w", err)
 	}
 
-	// Write the JSON data to the specified file.
 	err = os.WriteFile(filePath, jsonData, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write cache file: %w", err)
+		return fmt.Errorf("failed to write cache file to %s: %w", filePath, err)
 	}
 
 	log.Println("Successfully saved ESI cache to", filePath)
@@ -80,7 +79,6 @@ func (c *ESIClient) SaveCacheToFile(filePath string) error {
 
 // LoadCacheFromFile loads the ESI cache from a JSON file into the EsiClient's memory.
 func (c *ESIClient) LoadCacheFromFile(filePath string) error {
-	// First, check if the file even exists. If not, it's the first run.
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		log.Println("Cache file not found, starting with an empty cache.")
 		return nil
@@ -88,15 +86,14 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 
 	jsonData, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to read cache file: %w", err)
+		return fmt.Errorf("failed to read cache file from %s: %w", filePath, err)
 	}
 
 	var data cacheData
 	if err := json.Unmarshal(jsonData, &data); err != nil {
-		return fmt.Errorf("failed to unmarshal cache data: %w", err)
+		return fmt.Errorf("failed to unmarshal cache data from %s: %w", filePath, err)
 	}
 
-	// Lock the mutex to safely write the loaded data into our maps.
 	c.cacheMutex.Lock()
 	defer c.cacheMutex.Unlock()
 
@@ -110,7 +107,7 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 	return nil
 }
 
-// SearchResponse is the top-level object for the entire API response.
+// ... (Structs: SearchResponse, Hit, EntityCounts are unchanged) ...
 type SearchResponse struct {
 	Hits               []Hit        `json:"hits"`
 	Query              string       `json:"query"`
@@ -122,8 +119,6 @@ type SearchResponse struct {
 	EntityOrder        []string     `json:"entityOrder"`
 	IsExactMatch       bool         `json:"isExactMatch"`
 }
-
-// Hit represents a single item within the search results.
 type Hit struct {
 	ID         int       `json:"id"`
 	Name       string    `json:"name"`
@@ -135,8 +130,6 @@ type Hit struct {
 	Ticker     string    `json:"ticker,omitempty"`
 	LastActive time.Time `json:"last_active,omitempty"`
 }
-
-// EntityCounts holds the breakdown of hits per category.
 type EntityCounts struct {
 	Items        int `json:"items"`
 	Ships        int `json:"ships"`
@@ -148,17 +141,22 @@ type EntityCounts struct {
 	Characters   int `json:"characters"`
 }
 
-// Centralized function to utilize search
-
-func performSearch(searchTerm string) (*SearchResponse, error) {
-	// Use a Read Lock for checking, which is more efficient if multiple searches happen at once.
+// performSearch is now a method on ESIClient.
+func (c *ESIClient) performSearch(searchTerm string) (*SearchResponse, error) {
 	baseURL := "https://eve-kill.com/api/search/"
 	fullURL := baseURL + url.PathEscape(searchTerm)
-	resp, err := http.Get(fullURL) //nolint:bodyclose // Body is closed in defer
+
+	// It now uses the configured client, solving the gzip issue.
+	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make search request: %w", err)
+		return nil, fmt.Errorf("failed to make search request to %s: %w", fullURL, err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search API returned non-200 status: %s", resp.Status)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read search response body: %w", err)
@@ -166,49 +164,23 @@ func performSearch(searchTerm string) (*SearchResponse, error) {
 
 	var apiResult SearchResponse
 	if err := json.Unmarshal(body, &apiResult); err != nil {
-		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
+		return nil, fmt.Errorf("error unmarshaling search JSON: %w", err)
 	}
 	return &apiResult, nil
 }
 
-func findSystemInResults(response *SearchResponse) (Hit, error) {
-	// Loop through each hit in the response's Hits slice.
+// ... (find...InResults functions are unchanged) ...
+// findHitByType searches for the first hit matching a specific type.
+func findHitByType(response *SearchResponse, hitType string) (Hit, error) {
+	log.Printf("Searching for type: '%s'", hitType) // Add this
 	for _, hit := range response.Hits {
-		// Check if the type is "system".
-		if hit.Type == "system" {
-			// If it is, we found our match. Return the hit and no error.
+		log.Printf("...checking hit of type: '%s'", hit.Type) // And this
+		// Now checks against the type passed into the function
+		if hit.Type == hitType {
 			return hit, nil
 		}
 	}
 
-	// If the loop finishes without finding a system, return an empty Hit and an error.
-	return Hit{}, fmt.Errorf("no system found in search results")
-}
-
-func findGroupInResults(response *SearchResponse) (Hit, error) {
-	// Loop through each hit in the response's Hits slice.
-	for _, hit := range response.Hits {
-		// Check if the type is "system".
-		if hit.Type == "corporations" {
-			// If it is, we found our match. Return the hit and no error.
-			return hit, nil
-		}
-	}
-
-	// If the loop finishes without finding a system, return an empty Hit and an error.
-	return Hit{}, fmt.Errorf("no corporations found in search results")
-}
-
-func findAllianceInResults(response *SearchResponse) (Hit, error) {
-	// Loop through each hit in the response's Hits slice.
-	for _, hit := range response.Hits {
-		// Check if the type is "system".
-		if hit.Type == "alliances" {
-			// If it is, we found our match. Return the hit and no error.
-			return hit, nil
-		}
-	}
-
-	// If the loop finishes without finding a system, return an empty Hit and an error.
-	return Hit{}, fmt.Errorf("no alliances found in search results")
+	// The error message is now dynamic as well
+	return Hit{}, fmt.Errorf("no hit of type '%s' found in search results", hitType)
 }

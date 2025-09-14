@@ -43,7 +43,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
-		status, err := getAPIStatus()
+		status, err := esiClient.getAPIStatus()
 		if err != nil {
 			log.Printf("Error fetching API status: %v", err)
 			s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
@@ -131,6 +131,11 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		toolLinks := []string{
 			"[EVE-KILL](https://eve-kill.com/)",
 			"[Z-Kill](https://zkillboard.com/)",
+			"[SeAT](https://github.com/eveseat/seat/)",
+			"[EVE Workbench](https://github.com/EVE-Workbench)",
+			"[Alliance Auth](https://gitlab.com/allianceauth/allianceauth/)",
+			"[DSCAN ICU](https://dscan.icu/)",
+			"[Eve Buddy](https://github.com/ErikKalkoken/evebuddy)",
 		}
 
 		// You will need to import the "strings" package for this to work.
@@ -170,7 +175,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 		guildID := i.GuildID
 		if _, ok := subscriptions[guildID][channelID]; !ok {
-			responseMessage := fmt.Sprintf("⚠️ This channel isn't subscribed to any topics.")
+			responseMessage := "⚠️ This channel isn't subscribed to any topics."
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
@@ -214,7 +219,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		systemName := options[0].StringValue()
 
 		// 3. Call your API search function.
-		searchResult, err := performSearch(systemName)
+		searchResult, err := esiClient.performSearch(systemName)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", systemName, err)
 			errorMessage := "❌ An error occurred while contacting the search API."
@@ -226,7 +231,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// 4. Filter the results to find the system.
 		// (This assumes you have the findSystemInResults function we discussed)
-		systemHit, err := findSystemInResults(searchResult)
+		systemHit, err := findHitByType(searchResult, "systems")
 		if err != nil {
 			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find a system named `%s`.", systemName)
@@ -271,7 +276,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		corporationNames := options[0].StringValue()
 
 		// 3. Call your API search function.
-		searchResult, err := performSearch(corporationNames)
+		searchResult, err := esiClient.performSearch(corporationNames)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", corporationNames, err)
 			errorMessage := "❌ An error occurred while contacting the search API."
@@ -283,7 +288,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// 4. Filter the results to find the system.
 		// (This assumes you have the findSystemInResults function we discussed)
-		corporationHit, err := findGroupInResults(searchResult)
+		corpHit, err := findHitByType(searchResult, "corporation")
 		if err != nil {
 			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find a corporation named `%s`.", corporationNames)
@@ -295,7 +300,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// 5. Format a nice reply with an embed.
 		// (You can add more fields here later, like security status, region, etc.)
-		finalURL := fmt.Sprintf("https://eve-kill.com/corporation/%d", corporationHit.ID)
+		finalURL := fmt.Sprintf("https://eve-kill.com/corporation/%d", corpHit.ID)
 		embed := &discordgo.MessageEmbed{
 			Title: fmt.Sprintf("Intel Report: %s", corporationNames),
 			Color: 0x00bfff, // A nice blue color
@@ -328,7 +333,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		allianceName := options[0].StringValue()
 
 		// 3. Call your API search function.
-		searchResult, err := performSearch(allianceName)
+		searchResult, err := esiClient.performSearch(allianceName)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", allianceName, err)
 			errorMessage := "❌ An error occurred while contacting the search API."
@@ -340,7 +345,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// 4. Filter the results to find the system.
 		// (This assumes you have the findSystemInResults function we discussed)
-		allianceHit, err := findAllianceInResults(searchResult)
+		allianceHit, err := findHitByType(searchResult, "alliance")
 		if err != nil {
 			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find an alliance named `%s`.", allianceHit.Name)
