@@ -51,13 +51,15 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			})
 			return
 		}
+
+		corpLogoURL := esiClient.GetRandomCorporationLogoURL()
 		uptime := time.Since(status.StartTime)
 		uptimeStr := fmt.Sprintf("%d hours, %d minutes", int(uptime.Hours()), int(uptime.Minutes())%60)
 		embed := &discordgo.MessageEmbed{
 			Title: "EVE Online Server Status",
 			Color: 0x00ff00,
 			Thumbnail: &discordgo.MessageEmbedThumbnail{
-				URL: "https://web.ccpgamescdn.com/eveonlineassets/images/primary_logo_eve_in-game.png",
+				URL: corpLogoURL,
 			},
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "Players Online", Value: fmt.Sprintf("%d", status.Players), Inline: true},

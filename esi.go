@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -187,4 +188,21 @@ func (c *ESIClient) GetSystemDetails(systemID int) (*ESISystemInfo, error) {
 	}
 
 	return nil, fmt.Errorf("system ID %d not found in local cache", systemID)
+}
+
+func (c *ESIClient) GetRandomCorporationLogoURL() string {
+	c.cacheMutex.RLock()
+	defer c.cacheMutex.RUnlock()
+	corpIDs := make([]int, 0, len(c.corporationNames))
+	for id := range c.corporationNames {
+		corpIDs = append(corpIDs, id)
+	}
+
+	if len(corpIDs) > 0 {
+		randomIndex := rand.Intn(len(corpIDs))
+		randomCorpID := corpIDs[randomIndex]
+		return fmt.Sprintf("https://images.evetech.net/corporations/%d/logo?size=128", randomCorpID)
+	}
+	// Backup should the cache be empty
+	return "https://images.evetech.net/corporations/109299958/logo?size=128"
 }
