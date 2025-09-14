@@ -54,7 +54,6 @@ It’s a **public bot**. No building required—just invite it and pray.
 ### Quick Invite Link
 👉 [**Invite Firehawk to Your Server**](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot%20applications.commands&permissions=8)  
 
-*(Replace `YOUR_CLIENT_ID` with the bot’s actual client ID.)*  
 
 ---
 
