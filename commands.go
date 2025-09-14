@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"golang.org/x/text/language" // <-- 1. Import language package
+	"golang.org/x/text/message"
 )
 
 // You will also need getAPIStatus() and a global esiClient variable defined elsewhere.
@@ -51,6 +53,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			})
 			return
 		}
+		p := message.NewPrinter(language.English)
+		playersStr := p.Sprintf("%d", status.Players)
 
 		corpLogoURL := esiClient.GetRandomCorporationLogoURL()
 		uptime := time.Since(status.StartTime)
@@ -62,7 +66,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 				URL: corpLogoURL,
 			},
 			Fields: []*discordgo.MessageEmbedField{
-				{Name: "Players Online", Value: fmt.Sprintf("%d", status.Players), Inline: true},
+				{Name: "Players Online", Value: playersStr, Inline: true},
 				{Name: "Server Uptime", Value: uptimeStr, Inline: true},
 				{Name: "Server Version", Value: status.ServerVersion},
 			},
