@@ -27,6 +27,8 @@ Inspired by the *actually good* [Firetail Bot](https://forums.eveonline.com/t/fi
 - **Mostly Correct Data** → Fetches & caches IDs so you don’t have to remember what `30000142` is.  
 - **Server Status** → Tells you if Tranquility is alive.  
 - **Character Lookup** → Pulls a character’s killboard info.  
+- **Group & Alliance Lookup** → Groups and alliances are now supported!  
+- **Tools Command** → Lists useful third-party EVE Online tools.  
 - **Location Scout** → Info on systems before you blindly jump in (WIP).  
 
 ---
@@ -34,12 +36,15 @@ Inspired by the *actually good* [Firetail Bot](https://forums.eveonline.com/t/fi
 ## 🚀 Commands
 Slash commands only. You know the drill.  
 
-| Command                          | Description                                | Example                          |
-| -------------------------------- | ------------------------------------------ | -------------------------------- |
-| `/status`                        | Checks if the TQ hamster is alive.         | `/status`                        |
-| `/lookup <character_name>`       | Shows a character’s public record of shame.| `/lookup The Mittani`            |
-| `/subscribe <topic> [channel]`   | Starts killmail spam in a channel.         | `/subscribe topic:Big Kills`     |
-| `/unsubscribe <topic> [channel]` | Stops the spam (mercifully).               | `/unsubscribe topic:All Kills`   |
+| Command                          | Description                                 | Example                          |
+| -------------------------------- | ------------------------------------------- | -------------------------------- |
+| `/status`                        | Checks if the TQ hamster is alive.          | `/status`                        |
+| `/lookup <character_name>`       | Shows a character’s public record of shame. | `/lookup The Mittani`            |
+| `/group <group_name>`            | Looks up information about a group.         | `/group Pandemic Horde`          |
+| `/alliance <alliance_name>`      | Looks up information about an alliance.     | `/alliance Goonswarm Federation` |
+| `/tools`                         | Lists useful third-party tools.             | `/tools`                         |
+| `/subscribe <topic> [channel]`   | Starts killmail spam in a channel.          | `/subscribe topic:Big Kills`     |
+| `/unsubscribe <topic> [channel]` | Stops the spam (mercifully).                | `/unsubscribe topic:All Kills`   |
 
 ---
 
@@ -54,16 +59,15 @@ It’s a **public bot**. No building required—just invite it and pray.
 ---
 
 ## 🛠️ Roadmap / TODO
-- Add **goroutines** to ESI client for performance.  
 - Refine **embeds** for better presentation.  
-- Add **AI connection?** 🤔  
+- Add **AI connection?** 🤔  (Because I want to be trendy)
 - Dad Joke API (because why not).  
 - Weather API (because it’s somehow sunny in December).  
-- Better `.env` integration.  
 - Static data improvements.  
-- Help function.  
-- Broadcast function.  
-- Market price lookup command.  
+- Help function.  (When people dont want to read this)
+- Broadcast function.  (Intrusive)
+- Market price lookup command.  (Can I be fucked?)
+- Integrate thera bot?
 
 ---
 
