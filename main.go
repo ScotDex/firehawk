@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -13,8 +12,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// The only global needed is the client itself.
 var esiClient *ESIClient
-var systemsData map[int]ESISystemInfo
 
 // Create one shared client for the entire application to use.
 var sharedHttpClient = &http.Client{
@@ -24,9 +23,8 @@ var sharedHttpClient = &http.Client{
 	},
 }
 
-const targetChannelID = "1415431475368693823"
 const cacheFilePath = "esi_cache.json"
-const systemCache = "systems.json"
+const systemCachePath = "systems.json" // Renamed for clarity
 
 // goSafely launches a function in a new goroutine and recovers from panics.
 func goSafely(fn func()) {
@@ -52,26 +50,23 @@ func main() {
 	}
 
 	log.Println("Bot token loaded successfully")
+
+	// Create the client and load all caches.
 	esiClient = NewESIClient("themadlyscientific@gmail.com")
+
+	// Load static system data using the dedicated client method.
+	if err := esiClient.LoadSystemCache(systemCachePath); err != nil {
+		log.Printf("WARNING: could not load static system cache: %v", err)
+
+	}
+	// Load the dynamic cache.
 	if err := esiClient.LoadCacheFromFile(cacheFilePath); err != nil {
-		log.Printf("Warning: could not load ESI cache: %v", err)
+		log.Printf("Warning: could not load dynamic ESI cache: %v", err)
 	}
 
 	dg, err := discordgo.New("Bot " + botToken)
 	if err != nil {
 		log.Fatalf("Error creating Discord session: %v", err)
-	}
-
-	// Load static system data, but don't crash if it fails.
-	fileData, err := os.ReadFile(systemCache)
-	if err != nil {
-		log.Printf("WARNING: Could not read systems.json: %v. System lookups may fail.", err)
-	} else {
-		if err := json.Unmarshal(fileData, &systemsData); err != nil {
-			log.Printf("WARNING: Could not parse systems.json: %v. System lookups may fail.", err)
-		} else {
-			log.Printf("Successfully loaded %d systems into cache.", len(systemsData))
-		}
 	}
 
 	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -88,10 +83,13 @@ func main() {
 	}
 	defer dg.Close()
 
-	// Start the killmail poller safely.
-	goSafely(func() {
-		killmailPoller(dg, targetChannelID)
-	})
+	// Use os.Getenv for the channel ID for better configuration
+	killmailChannelID := os.Getenv("KILLMAIL_CHANNEL_ID")
+	if killmailChannelID != "" {
+		goSafely(func() {
+			killmailPoller(dg, killmailChannelID)
+		})
+	}
 
 	log.Println("Registering Commands")
 	for _, cmd := range commands {

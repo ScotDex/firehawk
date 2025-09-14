@@ -18,6 +18,7 @@ type ESISystemInfo struct {
 	SecurityStatus  float64 `json:"security_status"`
 	ConstellationID int     `json:"constellation_id"`
 	SystemID        int     `json:"system_id"`
+	RegionID        int     `json:"region_id"`
 }
 
 // Global variable for the number of concurrent workers. Adjust as needed.

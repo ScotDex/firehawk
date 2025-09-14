@@ -251,18 +251,33 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 5. Format a nice reply with an embed.
-		// (You can add more fields here later, like security status, region, etc.)
+		systemDetails, err := esiClient.GetSystemDetails(systemHit.ID)
+		if err != nil {
+			log.Printf("Error fetching system details: %v", err)
+			errorMessage := "❌ Could not retrieve detailed intel for that system (missing from local cache)."
+			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+				Content: &errorMessage,
+			})
+			return
+		}
+
+		secStatusColor := getSecStatusColor(systemDetails.SecurityStatus)
+		regionName := esiClient.GetRegionName(systemDetails.RegionID)
+		constellationName := esiClient.GetConstellationName(systemDetails.ConstellationID)
 		finalURL := fmt.Sprintf("https://eve-kill.com/system/%d", systemHit.ID)
 		embed := &discordgo.MessageEmbed{
 			Title: fmt.Sprintf("Intel Report: %s", systemHit.Name),
-			Color: 0x00bfff, // A nice blue color
+			URL:   finalURL,
+			Color: secStatusColor, // A nice blue color
 			Fields: []*discordgo.MessageEmbedField{
-				{Name: "System Details", Value: finalURL, Inline: true},
-				{Name: "System Report Link", Value: fmt.Sprintf("%v", systemHit.Name), Inline: true},
+				{Name: "System Details", Value: finalURL, Inline: false},
+				{Name: "System Report Link", Value: fmt.Sprintf("%v", systemHit.Name), Inline: false},
+				{Name: "Region", Value: regionName, Inline: false},
+				{Name: "Constellation", Value: constellationName, Inline: false},
+				{Name: "Security Status", Value: fmt.Sprintf("%.2f", systemDetails.SecurityStatus), Inline: false},
 			},
 			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Source: EVE-KILL Search API",
+				Text: "Powered by Firehawk | Data from EVE ESI",
 			},
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
