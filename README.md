@@ -61,6 +61,16 @@ A list of things I'll probably get around to building eventually.
 * Dad Joke API - because why not?
 * Weather API because, global warming means its sunny in december these days...
 
+Add go routines to esi client to improve performance.
+Refine embeds for better presentation
+Add AI connection?
+Dad Joke API
+Integrate enviroment file better?
+Static Data
+Help function
+Broadcast function?
+
+
 ---
 
 ## ❤️ Acknowledgements

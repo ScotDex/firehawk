@@ -43,11 +43,12 @@ func (c *ESIClient) getAPIStatus() (*ServerStatus, error) {
 }
 
 type cacheData struct {
-	CharacterNames   map[int]string         `json:"characterNames"`
-	CorporationNames map[int]string         `json:"corporationNames"`
-	ShipNames        map[int]string         `json:"shipNames"`
-	SystemNames      map[int]string         `json:"systemNames"`
-	SystemInfoCache  map[int]*ESISystemInfo `json:"systemInfoCache"`
+	CharacterNames   map[int]string            `json:"characterNames"`
+	CorporationNames map[int]string            `json:"corporationNames"`
+	ShipNames        map[int]string            `json:"shipNames"`
+	SystemNames      map[int]string            `json:"systemNames"`
+	SystemInfoCache  map[int]*ESISystemInfo    `json:"systemInfoCache"`
+	SearchResults    map[string]SearchResponse `json:"searchResults"`
 }
 
 // SaveCacheToFile saves the ESI client's in-memory cache to a JSON file.
@@ -61,6 +62,7 @@ func (c *ESIClient) SaveCacheToFile(filePath string) error {
 		ShipNames:        c.shipNames,
 		SystemNames:      c.systemNames,
 		SystemInfoCache:  c.systemInfoCache,
+		SearchResults:    c.searchResults,
 	}
 
 	jsonData, err := json.MarshalIndent(data, "", "  ")
@@ -101,7 +103,8 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 	c.corporationNames = data.CorporationNames
 	c.shipNames = data.ShipNames
 	c.systemNames = data.SystemNames
-	c.systemInfoCache = data.SystemInfoCache
+	c.systemInfoCache = data.SystemInfoCache // Corrected field name
+	c.searchResults = data.SearchResults
 
 	log.Println("Successfully loaded ESI cache from", filePath)
 	return nil
