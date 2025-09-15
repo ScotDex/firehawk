@@ -13,7 +13,8 @@ import (
 
 // You will also need getAPIStatus() and a global esiClient variable defined elsewhere.
 
-var subscriptions = make(map[string]map[string][]string)
+// map[channelID][]topics
+var subscriptions = make(map[string][]string)
 
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
 	{Name: "All Kills", Value: "all"}, {Name: "Big Kills", Value: "bigkills"},
@@ -103,33 +104,35 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		options := i.ApplicationCommandData().Options
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
-		for _, opt := range options {
+		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+		for _, opt := range i.ApplicationCommandData().Options {
 			optionMap[opt.Name] = opt
 		}
 		topic := optionMap["topic"].StringValue()
-		var channelID string
+		channelID := i.ChannelID
 		if channelOption, ok := optionMap["channel"]; ok {
 			channelID = channelOption.ChannelValue(s).ID
-		} else {
-			channelID = i.ChannelID
 		}
-		guildID := i.GuildID
-		if _, ok := subscriptions[guildID]; !ok {
-			subscriptions[guildID] = make(map[string][]string)
+
+		// Check for duplicate subscriptions
+		for _, existingTopic := range subscriptions[channelID] {
+			if existingTopic == topic {
+				responseMessage := fmt.Sprintf("⚠️ Channel <#%s> is already subscribed to the '%s' topic.", channelID, topic)
+				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
+				})
+				return
+			}
 		}
-		if _, ok := subscriptions[guildID][channelID]; !ok {
-			subscriptions[guildID][channelID] = []string{}
-		}
-		subscriptions[guildID][channelID] = append(subscriptions[guildID][channelID], topic)
-		log.Printf("New subscription added: Guild %s, Channel %s, Topic %s", guildID, channelID, topic)
+
+		// Add the new subscription
+		subscriptions[channelID] = append(subscriptions[channelID], topic)
+		log.Printf("New subscription added: Channel %s, Topic %s", channelID, topic)
 		responseMessage := fmt.Sprintf("✅ Subscribed channel <#%s> to the '%s' topic.", channelID, topic)
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: responseMessage,
-			},
+			Data: &discordgo.InteractionResponseData{Content: responseMessage},
 		})
 	},
 
@@ -171,20 +174,18 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"unsubscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		options := i.ApplicationCommandData().Options
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
-		for _, opt := range options {
+		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+		for _, opt := range i.ApplicationCommandData().Options {
 			optionMap[opt.Name] = opt
 		}
 		topicToRemove := optionMap["topic"].StringValue()
-		var channelID string
+		channelID := i.ChannelID
 		if channelOption, ok := optionMap["channel"]; ok {
 			channelID = channelOption.ChannelValue(s).ID
-		} else {
-			channelID = i.ChannelID
 		}
-		guildID := i.GuildID
-		if _, ok := subscriptions[guildID][channelID]; !ok {
+
+		originalTopics, found := subscriptions[channelID]
+		if !found || len(originalTopics) == 0 {
 			responseMessage := "⚠️ This channel isn't subscribed to any topics."
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -192,32 +193,32 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			})
 			return
 		}
-		originalTopics := subscriptions[guildID][channelID]
+
 		newTopics := []string{}
-		found := false
+		topicWasFound := false
 		for _, topic := range originalTopics {
 			if topic != topicToRemove {
 				newTopics = append(newTopics, topic)
 			} else {
-				found = true
+				topicWasFound = true
 			}
 		}
+
 		var responseMessage string
-		if !found {
+		if !topicWasFound {
 			responseMessage = fmt.Sprintf("⚠️ Channel <#%s> was not subscribed to the '%s' topic.", channelID, topicToRemove)
 		} else {
-			subscriptions[guildID][channelID] = newTopics
+			subscriptions[channelID] = newTopics
 			responseMessage = fmt.Sprintf("✅ Unsubscribed channel <#%s> from the '%s' topic.", channelID, topicToRemove)
-			log.Printf("Subscription removed: Guild %s, Channel %s, Topic %s", guildID, channelID, topicToRemove)
+			log.Printf("Subscription removed: Channel %s, Topic %s", channelID, topicToRemove)
 		}
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: responseMessage,
-				Flags:   discordgo.MessageFlagsEphemeral,
-			},
+			Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
 		})
 	},
+
 	"scout": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		// 1. Defer the response so Discord knows we're working on it.
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

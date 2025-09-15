@@ -45,6 +45,49 @@ type KillmailData struct {
 	} `json:"package"`
 }
 
+func generateKillmailTopics(pkg *KillmailData, systemInfo *ESISystemInfo) []string {
+	topics := []string{"all"}
+	zkb := pkg.Package.Zkb
+
+	if zkb.TotalValue >= 10_000_000_000 {
+		topics = append(topics, "10b")
+	}
+	if zkb.TotalValue >= 5_000_000_000 {
+		topics = append(topics, "5b")
+	}
+	if zkb.TotalValue >= 1_000_000_000 {
+		topics = append(topics, "bigkills")
+	}
+	if zkb.Solo {
+		topics = append(topics, "solo")
+	}
+	if zkb.Npc {
+		topics = append(topics, "npc")
+	}
+
+	if systemInfo != nil {
+		if systemInfo.SecurityStatus >= 0.5 {
+			topics = append(topics, "highsec")
+		} else if systemInfo.SecurityStatus > 0.0 {
+			topics = append(topics, "lowsec")
+		} else {
+			topics = append(topics, "nullsec")
+		}
+	}
+	return topics
+}
+
+func hasTopicMatch(killmailTopics, subscribedTopics []string) bool {
+	for _, kTopic := range killmailTopics {
+		for _, sTopic := range subscribedTopics {
+			if kTopic == sTopic {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // buildKillmailURL constructs the public URL for a given killmail ID.
 func buildKillmailURL(killID int) string {
 	return fmt.Sprintf("https://eve-kill.com/kill/%d", killID)
@@ -62,7 +105,7 @@ func formatISKHuman(value float64) string {
 }
 
 // killmailPoller is the main background process that fetches, enriches, and posts killmails.
-func killmailPoller(s *discordgo.Session, channelID string) {
+func killmailPoller(s *discordgo.Session) {
 	client := &http.Client{
 		Timeout: 90 * time.Second,
 	}
@@ -112,12 +155,10 @@ func killmailPoller(s *discordgo.Session, channelID string) {
 			continue
 		}
 
-		// --- 3. Filter out old killmails --- Commented out for testing
-		//	killTime := killmailData.Package.Killmail.KillmailTime
-		//	if time.Since(killTime) > 5*time.Minute {
-		//		log.Printf("Stale killmail (ID %d) received, skipping...", killmailData.Package.KillID)
-		//		continue
-		//	}
+		killTime := killmailData.Package.Killmail.KillmailTime
+		if time.Since(killTime) > 5*time.Minute {
+			continue
+		}
 
 		log.Printf("New killmail received: ID %d", killmailData.Package.KillID)
 
@@ -141,6 +182,12 @@ func killmailPoller(s *discordgo.Session, channelID string) {
 				}
 			}
 
+			systemInfo, err := esiClient.GetSystemDetails(pkg.Killmail.SolarSystemID)
+			if err != nil {
+				log.Printf("Poller: Could not get system details for kill %d: %v", killID, err)
+				continue
+			}
+
 			// --- 5. Enrich the data by fetching names for IDs ---
 			var victimName, victimCorp, victimShip, finalBlowName, finalBlowCorp, finalBlowShip, systemName string
 			var wg sync.WaitGroup
@@ -155,9 +202,10 @@ func killmailPoller(s *discordgo.Session, channelID string) {
 			wg.Wait()
 
 			// --- 6. Build and send the final Discord embed ---
+
 			url := buildKillmailURL(killID)
 			totalValueFormatted := formatISKHuman(pkg.Zkb.TotalValue)
-
+			topics := generateKillmailTopics(&killmailData, systemInfo)
 			embed := &discordgo.MessageEmbed{
 				Title:     fmt.Sprintf("%s destroyed in %s", victimShip, systemName),
 				URL:       url,
@@ -186,7 +234,12 @@ func killmailPoller(s *discordgo.Session, channelID string) {
 					Text: "Powered by Firehawk",
 				},
 			}
-			_, err := s.ChannelMessageSendEmbed(channelID, embed)
+			// Loops through all subscriptions and sends to matches
+			for channelID, subscribedTopics := range subscriptions {
+				if hasTopicMatch(topics, subscribedTopics) {
+					s.ChannelMessageSendEmbed(channelID, embed)
+				}
+			}
 			if err != nil {
 				log.Printf("Error sending enriched embed to Discord: %v", err)
 			} else {

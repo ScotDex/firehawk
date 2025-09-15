@@ -10,21 +10,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// The only global needed is the client itself.
 var esiClient *ESIClient
 
-// Create one shared client for the entire application to use.
-//var sharedHttpClient = &http.Client{
-//	Timeout: 15 * time.Second,
-//	Transport: &http.Transport{
-//		DisableCompression: false, // Enable Gzip
-//	},
-//}
-
 const cacheFilePath = "esi_cache.json"
-const systemCachePath = "systems.json" // Renamed for clarity
+const systemCachePath = "systems.json"
 
-// goSafely launches a function in a new goroutine and recovers from panics.
 func goSafely(fn func()) {
 	go func() {
 		defer func() {
@@ -48,16 +38,10 @@ func main() {
 	}
 
 	log.Println("Bot token loaded successfully")
-
-	// Create the client and load all caches.
 	esiClient = NewESIClient("themadlyscientific@gmail.com")
-
-	// Load static system data using the dedicated client method.
 	if err := esiClient.LoadSystemCache(systemCachePath); err != nil {
 		log.Printf("WARNING: could not load static system cache: %v", err)
-
 	}
-	// Load the dynamic cache.
 	if err := esiClient.LoadCacheFromFile(cacheFilePath); err != nil {
 		log.Printf("Warning: could not load dynamic ESI cache: %v", err)
 	}
@@ -67,13 +51,7 @@ func main() {
 		log.Fatalf("Error creating Discord session: %v", err)
 	}
 
-	dg.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		if i.Type == discordgo.InteractionApplicationCommand {
-			if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
-				handler(s, i)
-			}
-		}
-	})
+	dg.AddHandler(interactionCreate) // Using the named handler function
 
 	err = dg.Open()
 	if err != nil {
@@ -81,13 +59,10 @@ func main() {
 	}
 	defer dg.Close()
 
-	// Use os.Getenv for the channel ID for better configuration
-	killmailChannelID := os.Getenv("KILLMAIL_CHANNEL_ID")
-	if killmailChannelID != "" {
-		goSafely(func() {
-			killmailPoller(dg, killmailChannelID)
-		})
-	}
+	// Start the killmail poller. It no longer needs a channel ID.
+	goSafely(func() {
+		killmailPoller(dg)
+	})
 
 	log.Println("Registering Commands")
 	for _, cmd := range commands {
@@ -105,5 +80,14 @@ func main() {
 	log.Println("Shutting down bot. Saving cache...")
 	if err := esiClient.SaveCacheToFile(cacheFilePath); err != nil {
 		log.Printf("Error saving ESI cache: %v", err)
+	}
+}
+
+// interactionCreate is the handler for all slash command interactions.
+func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.Type == discordgo.InteractionApplicationCommand {
+		if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
+			handler(s, i)
+		}
 	}
 }
