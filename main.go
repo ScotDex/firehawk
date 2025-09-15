@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -59,6 +61,8 @@ func main() {
 	}
 	defer dg.Close()
 
+	go startHealthCheckServer()
+
 	// Start the killmail poller. It no longer needs a channel ID.
 	goSafely(func() {
 		killmailPoller(dg)
@@ -89,5 +93,23 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
 			handler(s, i)
 		}
+	}
+}
+
+// startHealthCheckServer starts a simple HTTP server for Cloud Run health checks.
+func startHealthCheckServer() {
+	// Cloud Run provides the port to listen on via the 'PORT' environment variable.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default port if not specified (for local testing)
+	}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Firehawk bot is running.")
+	})
+
+	log.Printf("Health check server starting on port %s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatalf("Failed to start health check server: %v", err)
 	}
 }
