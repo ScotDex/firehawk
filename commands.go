@@ -11,9 +11,6 @@ import (
 	"golang.org/x/text/message"
 )
 
-// You will also need getAPIStatus() and a global esiClient variable defined elsewhere.
-
-// map[channelID][]topics
 var subscriptions = make(map[string][]string)
 
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
