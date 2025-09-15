@@ -1,5 +1,7 @@
 # Firehawk Bot 🔥  
 
+See the bot working here https://discord.gg/tas2ggVUr3
+
 ---
 
 ## 📖 What Is This?
