@@ -1,70 +1,90 @@
-# Firehawk Bot 🔥  
+# Firehawk Bot 🔥
 
-See the bot working here https://discord.gg/tas2ggVUr3
+A high-performance, self-hostable EVE Online Discord bot written in Go.
+
+[![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
+[![Status](https://img.shields.io/badge/status-active-green.svg)](https://github.com/ScotDex/firehawk)
+[![Discord](https://img.shields.io/discord/790348216587255808?label=Support%20Server&logo=discord)](https://discord.gg/tas2ggVUr3)
 
 ---
 
-## 📖 What Is This?
-Another EVE Online Discord bot—because apparently there aren’t enough already.  
+## 📖 About Firehawk
 
-Written in GO - which was relatively simple. Although this could have been done better the example and code is here for you to use as you wish.
+Firehawk is a self-hosted Discord bot for EVE Online, providing real-time killmail alerts and useful in-game information lookups. Inspired by the excellent [Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283), this project was built as a learning exercise to explore high-performance, concurrent applications in Go.
 
-Currently going through 24h testing to ensure the code is robust enough to be hosted.
+It's designed to be lightweight, fast, and easily run by anyone using Docker.
 
-Inspired by the *actually good* [Firetail Bot](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).  
 
-*(Proof it sometimes works)*  
-<img width="480" height="204" alt="image" src="https://github.com/user-attachments/assets/a6d42196-813f-444e-9701-85b94d3d99cc" />  
 
 ---
 
 ## ✨ Features
-- **Killmail Spam** → Real-time killmails from `eve-kill.com` piped into your channel.  
-- **Endless Filtering** → Subscribe to specific killmail topics so you can pretend you only see the “important” ones.  
-- **Mostly Correct Data** → Fetches & caches IDs so you don’t have to remember what `30000142` is.  
-- **Server Status** → Tells you if Tranquility is alive.  
-- **Character Lookup** → Pulls a character’s killboard info.  
-- **Group & Alliance Lookup** → Groups and alliances are now supported!  
-- **Tools Command** → Lists useful third-party EVE Online tools.  (Feel free to add more)
-- **Location Scout** → Info on systems before you blindly jump in (WIP).  
+
+* **📰 Real-time Killmail Subscriptions:** Subscribe channels to filtered killmail feeds from `eve-kill.com`. Get alerts for big kills, solo kills, specific regions, and more.
+* **🛰️ Advanced Intel Lookups:** Get detailed, cached information on in-game entities like solar systems, corporations, and alliances.
+* **⚡ High-Performance Caching:** Utilizes a pre-seeded static cache for system data and a dynamic cache for API results to make lookups incredibly fast.
+* **🛠️ Utilities:** Includes commands for checking server status, looking up characters, and listing useful third-party tools.
 
 ---
 
-## 🚀 Commands
-Slash commands only. You know the drill.  
+## 🚀 Getting Started (Self-Hosting)
 
-| Command                          | Description                                 | Example                          |
-| -------------------------------- | ------------------------------------------- | -------------------------------- |
-| `/status`                        | Checks if the TQ hamster is alive.          | `/status`                        |
-| `/lookup <character_name>`       | Shows a character’s public record of shame. | `/lookup The Mittani`            |
-| `/group <group_name>`            | Looks up information about a group.         | `/group Pandemic Horde`          |
-| `/alliance <alliance_name>`      | Looks up information about an alliance.     | `/alliance Goonswarm Federation` |
-| `/tools`                         | Lists useful third-party tools.             | `/tools`                         |
-| `/subscribe <topic> [channel]`   | Starts killmail spam in a channel.          | `/subscribe topic:Big Kills`     |
-| `/unsubscribe <topic> [channel]` | Stops the spam (mercifully).                | `/unsubscribe topic:All Kills`   |
+Firehawk is designed to be self-hosted using Docker. Follow these instructions to get your own instance running.
+
+### Prerequisites
+
+Before you begin, you will need:
+* [Docker](https://www.docker.com/get-started) and Docker Compose installed on your system.
+* A **Discord Bot Token**. You can get one by creating a new application in the [Discord Developer Portal](https://discord.com/developers/applications).
+
+### Installation
+
+1.  **Clone the Repository**
+    Open your terminal, navigate to where you want to store the bot, and run the following command:
+    ```bash
+    git clone [https://github.com/ScotDex/firehawk.git](https://github.com/ScotDex/firehawk.git)
+    cd firehawk
+    ```
+
+2.  **Create Your Configuration File**
+    Copy the example configuration file to create your own. This file will store your secret bot token.
+    ```bash
+    cp .env.example .env
+    ```
+
+3.  **Edit the `.env` File**
+    Open the newly created `.env` file in a text editor and add your Discord bot token and a contact email (this is required by the ESI API).
+    ```env
+    DISCORD_BOT_TOKEN=YOUR_SECRET_BOT_TOKEN_HERE
+    ESI_CONTACT_EMAIL=your-email@example.com
+    ```
+
+4.  **Build and Run the Bot**
+    Use Docker Compose to build the container and run it in the background.
+    ```bash
+    docker-compose up --build -d
+    ```
+
+Your Firehawk bot should now be online and ready to be invited to your Discord server.
+
+---
+## 📋 Command Reference
+
+| Command                  | Description                                | Example                            |
+| ------------------------ | ------------------------------------------ | ---------------------------------- |
+| `/status`                | Checks the live status of the EVE server.  | `/status`                          |
+| `/scout [system]`        | Provides a detailed intel report on a system. | `/scout Jita`                      |
+| `/group [corporation]`   | Looks up a corporation.                    | `/group Pandemic Horde`            |
+| `/alliance [alliance]`   | Looks up an alliance.                      | `/alliance Goonswarm Federation`   |
+| `/lookup [character]`    | Provides a killboard link for a character. | `/lookup The Mittani`              |
+| `/tools`                 | Lists useful third-party websites.         | `/tools`                           |
+| `/subscribe [topic]`     | Subscribes the channel to a killmail feed. | `/subscribe topic:Big Kills`       |
+| `/unsubscribe [topic]`   | Unsubscribes the channel from a feed.      | `/unsubscribe topic:All Kills`     |
 
 ---
 
-## How do I install?
+## ❤️ Data Sources & Acknowledgements
 
-Visit the wiki for detailed information for your tech guy to look at.
-
----
-
-## 🛠️ Roadmap / TODO
-- Refine **embeds** for better presentation.
-- Add more sub choices.
-- Add **AI connection?** 🤔  (Because I want to be trendy)
-- Dad Joke API (because why not).  
-- Weather API (because it’s somehow sunny in December).  
-- Static data improvements.  
-- Help function.  (When people dont want to read this)
-- Market price lookup command.  (Can I be fucked?)
-- Integrate thera bot?
-
----
-
-## ❤️ Acknowledgements
-- Inspired by the legendary [**Firetail Bot**](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).  
-- Killmail data from **[Eve-Kill.com](https://eve-kill.com/)**.  
-- Game data from the **EVE Online ESI API** (when it feels like working).  
+* **Game Data:** All core game data is sourced from the official [**EVE Online ESI API**](https://esi.evetech.net/).
+* **Killmail Data:** Real-time killmail data is provided by the [**Eve-Kill.com**](https://eve-kill.com/) RedisQ feed.
+* **Inspiration:** This project was heavily inspired by the legendary [**Firetail Bot**](https://forums.eveonline.com/t/firetail-eve-discord-bot/45283).
