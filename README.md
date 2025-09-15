@@ -52,13 +52,13 @@ Visit the wiki for detailed information for your tech guy to look at.
 ---
 
 ## 🛠️ Roadmap / TODO
-- Refine **embeds** for better presentation.  
+- Refine **embeds** for better presentation.
+- Add more sub choices.
 - Add **AI connection?** 🤔  (Because I want to be trendy)
 - Dad Joke API (because why not).  
 - Weather API (because it’s somehow sunny in December).  
 - Static data improvements.  
 - Help function.  (When people dont want to read this)
-- Broadcast function.  (Intrusive)
 - Market price lookup command.  (Can I be fucked?)
 - Integrate thera bot?
 
