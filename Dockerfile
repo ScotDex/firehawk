@@ -30,7 +30,6 @@ WORKDIR /app
 # Copy only the compiled executable from the 'builder' stage.
 # Also copy the .env file for configuration.
 COPY --from=builder /app/firehawk .
-COPY .env .
 
 COPY esi_cache.json .
 COPY systems.json .
