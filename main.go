@@ -1,32 +1,29 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 )
 
+// Global ESIClient variable
 var esiClient *ESIClient
 
-const cacheFilePath = "esi_cache.json"
-const systemCachePath = "systems.json"
+// --- Constants ---
+const (
+	cacheFilePath        = "esi_cache.json"
+	systemCachePath      = "systems.json"
+	killmailWebSocketURL = "wss://ws.eve-kill.com/killmails" // Correct WebSocket URL
 
-func goSafely(fn func()) {
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Printf("CRITICAL: Panic recovered in goroutine: %v", err)
-			}
-		}()
-		fn()
-	}()
-}
+)
 
 func main() {
 	err := godotenv.Load()
@@ -53,7 +50,7 @@ func main() {
 		log.Fatalf("Error creating Discord session: %v", err)
 	}
 
-	dg.AddHandler(interactionCreate) // Using the named handler function
+	dg.AddHandler(interactionCreate)
 
 	err = dg.Open()
 	if err != nil {
@@ -61,13 +58,11 @@ func main() {
 	}
 	defer dg.Close()
 
+	// Start background services
 	go startHealthCheckServer()
+	go killmailStreamer(dg, esiClient) // Correctly start the streamer with dependencies
 
-	// Start the killmail poller. It no longer needs a channel ID.
-	goSafely(func() {
-		killmailPoller(dg)
-	})
-
+	// Register commands after the bot is running
 	log.Println("Registering Commands")
 	for _, cmd := range commands {
 		_, err := dg.ApplicationCommandCreate(dg.State.User.ID, "", cmd)
@@ -87,29 +82,74 @@ func main() {
 	}
 }
 
+func killmailStreamer(s *discordgo.Session, esi *ESIClient) {
+	log.Println("Starting WebSocket killmail streamer...")
+
+	for { // Main reconnection loop
+		conn, _, err := websocket.DefaultDialer.Dial(killmailWebSocketURL, nil)
+		if err != nil {
+			log.Printf("Error connecting to WebSocket: %v", err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+		log.Println("Successfully connected to killmail WebSocket.")
+
+		// Handles low-level protocol pings to keep the connection alive.
+		pongWait := 60 * time.Second
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(pongWait))
+			return nil
+		})
+
+		if err := conn.WriteMessage(websocket.TextMessage, []byte("all")); err != nil {
+			log.Printf("Error subscribing to killmail feed: %v", err)
+			conn.Close()
+			continue
+		}
+		log.Println("Subscribed to 'all' killmails topic.")
+
+		for { // Message reading loop
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				log.Println("Read error, disconnecting:", err)
+				break
+			}
+
+			conn.SetReadDeadline(time.Now().Add(pongWait))
+
+			// Handles application-level pings by echoing the timestamp in a JSON reply.
+			var msg SocketMessage
+			if err := json.Unmarshal(message, &msg); err == nil && msg.Type == "ping" {
+				var pingMsg PingMessage
+				if err := json.Unmarshal(message, &pingMsg); err == nil {
+					log.Println("Received application ping, sending JSON pong with timestamp...")
+
+					pongReply := fmt.Sprintf(`{"type":"pong","timestamp":"%s"}`, pingMsg.Timestamp)
+
+					if err := conn.WriteMessage(websocket.TextMessage, []byte(pongReply)); err != nil {
+						log.Printf("Error sending application pong: %v", err)
+					}
+				}
+				continue // Don't process this ping message any further.
+			}
+
+			// If it's not a ping, pass it to the killmail handler.
+			msgCopy := make([]byte, len(message))
+			copy(msgCopy, message)
+			go HandleKillmailMessage(s, msgCopy)
+		}
+
+		conn.Close()
+		log.Println("Disconnected. Attempting to reconnect...")
+	}
+}
+
 // interactionCreate is the handler for all slash command interactions.
 func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type == discordgo.InteractionApplicationCommand {
 		if handler, ok := commandHandlers[i.ApplicationCommandData().Name]; ok {
 			handler(s, i)
 		}
-	}
-}
-
-// startHealthCheckServer starts a simple HTTP server for Cloud Run health checks.
-func startHealthCheckServer() {
-	// Cloud Run provides the port to listen on via the 'PORT' environment variable.
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080" // Default port if not specified (for local testing)
-	}
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Firehawk bot is running.")
-	})
-
-	log.Printf("Health check server starting on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatalf("Failed to start health check server: %v", err)
 	}
 }

@@ -100,36 +100,71 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		})
 	},
 
+	// In your 'commandHandlers' map
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
 		for _, opt := range i.ApplicationCommandData().Options {
 			optionMap[opt.Name] = opt
 		}
-		topic := optionMap["topic"].StringValue()
+
+		// Determine the target channel
 		channelID := i.ChannelID
 		if channelOption, ok := optionMap["channel"]; ok {
 			channelID = channelOption.ChannelValue(s).ID
 		}
 
-		// Check for duplicate subscriptions
-		for _, existingTopic := range subscriptions[channelID] {
-			if existingTopic == topic {
-				responseMessage := fmt.Sprintf("⚠️ Channel <#%s> is already subscribed to the '%s' topic.", channelID, topic)
-				s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-					Type: discordgo.InteractionResponseChannelMessageWithSource,
-					Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
-				})
-				return
+		// Collect all topics the user provided
+		topicsToAdd := []string{}
+		for i := 1; i <= 5; i++ { // Check for topic1, topic2, etc.
+			topicName := fmt.Sprintf("topic%d", i)
+			if topicOption, ok := optionMap[topicName]; ok {
+				topicsToAdd = append(topicsToAdd, topicOption.StringValue())
 			}
 		}
 
-		// Add the new subscription
-		subscriptions[channelID] = append(subscriptions[channelID], topic)
-		log.Printf("New subscription added: Channel %s, Topic %s", channelID, topic)
-		responseMessage := fmt.Sprintf("✅ Subscribed channel <#%s> to the '%s' topic.", channelID, topic)
+		// Add new topics, avoiding duplicates
+		newlyAdded := []string{}
+		alreadyExists := []string{}
+		existingTopics := subscriptions[channelID]
+
+		for _, topic := range topicsToAdd {
+			isDuplicate := false
+			for _, existing := range existingTopics {
+				if topic == existing {
+					isDuplicate = true
+					break
+				}
+			}
+			if isDuplicate {
+				alreadyExists = append(alreadyExists, fmt.Sprintf("`%s`", topic))
+			} else {
+				subscriptions[channelID] = append(subscriptions[channelID], topic)
+				newlyAdded = append(newlyAdded, fmt.Sprintf("`%s`", topic))
+			}
+		}
+
+		// --- SAVE THE SUBSCRIPTIONS TO THE CACHE FILE ---
+		if len(newlyAdded) > 0 {
+			if err := esiClient.SaveCacheToFile(cacheFilePath); err != nil {
+				log.Printf("CRITICAL: Failed to save subscriptions to cache: %v", err)
+				// You might want to send an error message to the user here
+			}
+		}
+
+		// Build a clear response message for the user
+		var responseBuilder strings.Builder
+		if len(newlyAdded) > 0 {
+			responseBuilder.WriteString(fmt.Sprintf("✅ Subscribed channel <#%s> to: %s\n", channelID, strings.Join(newlyAdded, ", ")))
+		}
+		if len(alreadyExists) > 0 {
+			responseBuilder.WriteString(fmt.Sprintf("⚠️ Already subscribed to: %s", strings.Join(alreadyExists, ", ")))
+		}
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{Content: responseMessage},
+			Data: &discordgo.InteractionResponseData{
+				Content: responseBuilder.String(),
+			},
 		})
 	},
 
