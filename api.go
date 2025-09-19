@@ -152,8 +152,6 @@ type EntityCounts struct {
 func (c *ESIClient) performSearch(searchTerm string) (*SearchResponse, error) {
 	baseURL := "https://eve-kill.com/api/search/"
 	fullURL := baseURL + url.PathEscape(searchTerm)
-
-	// It now uses the configured client, solving the gzip issue.
 	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make search request to %s: %w", fullURL, err)
@@ -176,8 +174,7 @@ func (c *ESIClient) performSearch(searchTerm string) (*SearchResponse, error) {
 	return &apiResult, nil
 }
 
-// ... (find...InResults functions are unchanged) ...
-// findHitByType searches for the first hit matching a specific type.
+// Established search function to avoid DRY - sometimes inaccurate due to it being fuzzy.
 func findHitByType(response *SearchResponse, hitType string) (Hit, error) {
 	log.Printf("Searching for type: '%s'", hitType) // Add this
 	for _, hit := range response.Hits {

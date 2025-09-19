@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 )
 
 func hasTopicMatch(killmailTopics, subscribedTopics []string) bool {
@@ -17,9 +16,6 @@ func hasTopicMatch(killmailTopics, subscribedTopics []string) bool {
 	return false
 }
 
-// buildKillmailURL constructs the public URL for a given killmail ID.
-
-// goSafely is a utility to run goroutines with panic recovery.
 func goSafely(fn func()) {
 	go func() {
 		defer func() {
@@ -127,22 +123,4 @@ func generateKillmailTopics(data *EnrichedKillmailData) []string {
 	}
 
 	return topics
-}
-
-func timeAgo(t time.Time) string {
-	duration := time.Since(t)
-	days := int(duration.Hours() / 24)
-	hours := int(duration.Hours()) % 24
-	minutes := int(duration.Minutes()) % 60
-
-	if days > 0 {
-		return fmt.Sprintf("%d days ago", days)
-	}
-	if hours > 0 {
-		return fmt.Sprintf("%d hours ago", hours)
-	}
-	if minutes > 0 {
-		return fmt.Sprintf("%d minutes ago", minutes)
-	}
-	return "Just now"
 }

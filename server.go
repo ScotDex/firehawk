@@ -7,11 +7,13 @@ import (
 	"os"
 )
 
+// Health service to keep it running on cloud run - not needed if you want to run it on digital ocean/container
+
 func startHealthCheckServer() {
-	// Cloud Run provides the port to listen on via the 'PORT' environment variable.
+
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Default port if not specified (for local testing)
+		port = "8080"
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

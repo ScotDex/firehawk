@@ -83,7 +83,7 @@ func main() {
 }
 
 func killmailStreamer(s *discordgo.Session, esi *ESIClient) {
-	log.Println("Starting WebSocket killmail streamer...")
+	log.Println("Kicking off web socket connection")
 
 	for { // Main reconnection loop
 		conn, _, err := websocket.DefaultDialer.Dial(killmailWebSocketURL, nil)
@@ -92,7 +92,7 @@ func killmailStreamer(s *discordgo.Session, esi *ESIClient) {
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		log.Println("Successfully connected to killmail WebSocket.")
+		log.Println("Web socket connected - streaming messages.")
 
 		// Handles low-level protocol pings to keep the connection alive.
 		pongWait := 60 * time.Second
@@ -107,7 +107,7 @@ func killmailStreamer(s *discordgo.Session, esi *ESIClient) {
 			conn.Close()
 			continue
 		}
-		log.Println("Subscribed to 'all' killmails topic.")
+		log.Println("Subscribed to 'all' killmails topic, filters will apply accordingly.")
 
 		for { // Message reading loop
 			_, message, err := conn.ReadMessage()
@@ -123,7 +123,7 @@ func killmailStreamer(s *discordgo.Session, esi *ESIClient) {
 			if err := json.Unmarshal(message, &msg); err == nil && msg.Type == "ping" {
 				var pingMsg PingMessage
 				if err := json.Unmarshal(message, &pingMsg); err == nil {
-					log.Println("Received application ping, sending JSON pong with timestamp...")
+					log.Println("Recieved Ping, responding with Pong")
 
 					pongReply := fmt.Sprintf(`{"type":"pong","timestamp":"%s"}`, pingMsg.Timestamp)
 
