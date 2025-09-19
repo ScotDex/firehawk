@@ -42,45 +42,45 @@ func formatISKHuman(value float64) string {
 }
 
 // generateKillmailTopics checks a killmail and returns a slice of matching topics.
-func generateKillmailTopics(data *EnrichedKillmailData) []string {
+func generateKillmailTopics(data *KillmailData) []string {
 	topics := []string{"all"}
 
 	// --- Value-based topics ---
-	if data.TotalValue >= 10_000_000_000 {
+	if data.Killmail.TotalValue >= 10_000_000_000 {
 		topics = append(topics, "10b")
 	}
-	if data.TotalValue >= 5_000_000_000 {
+	if data.Killmail.TotalValue >= 5_000_000_000 {
 		topics = append(topics, "5b")
 	}
-	if data.TotalValue >= 1_000_000_000 {
+	if data.Killmail.TotalValue >= 1_000_000_000 {
 		topics = append(topics, "bigkills")
 	}
 
 	// --- Attribute-based topics ---
-	if data.IsSolo {
+	if data.Killmail.IsSolo {
 		topics = append(topics, "solo")
 	}
-	if data.IsNpc {
+	if data.Killmail.IsNpc {
 		topics = append(topics, "npc")
 	}
 
 	// --- Location-based topics ---
-	if data.RegionID >= 12000001 {
+	if data.Killmail.RegionID >= 12000001 {
 		topics = append(topics, "abyssal")
 	}
-	if data.RegionID >= 11000000 && data.RegionID < 12000000 {
+	if data.Killmail.RegionID >= 11000000 && data.Killmail.RegionID < 12000000 {
 		topics = append(topics, "wspace")
 	}
-	if data.SystemSecurity >= 0.5 {
+	if data.Killmail.SystemSecurity >= 0.5 {
 		topics = append(topics, "highsec")
-	} else if data.SystemSecurity > 0.0 {
+	} else if data.Killmail.SystemSecurity > 0.0 {
 		topics = append(topics, "lowsec")
 	} else {
 		topics = append(topics, "nullsec")
 	}
 
 	// --- Ship-based topics (using the victim's ship group ID) ---
-	switch data.Victim.ShipGroupID {
+	switch data.Killmail.Victim.ShipGroupID {
 	// T1 Subcaps
 	case 25: // Frigate
 		topics = append(topics, "frigates", "t1")

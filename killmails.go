@@ -36,7 +36,7 @@ func HandleKillmailMessage(s *discordgo.Session, message []byte) {
 func processAndSendKillmail(s *discordgo.Session, data *KillmailData) {
 	killID := data.Killmail.KillmailID
 	log.Printf("Processing new killmail: ID %d | Value: %.2f ISK", killID, data.Killmail.TotalValue)
-
+	killmailTopics := generateKillmailTopics(data)
 	systemName := data.Killmail.SystemName
 	victimName := data.Killmail.Victim.CharacterName
 	victimCorp := data.Killmail.Victim.CorporationName
@@ -78,10 +78,22 @@ func processAndSendKillmail(s *discordgo.Session, data *KillmailData) {
 		Footer: &discordgo.MessageEmbedFooter{Text: "Powered by Firehawk"},
 	}
 
-	_, err := s.ChannelMessageSendEmbed("1417920853894500352", embed) // Replace with your channel ID
-	if err != nil {
-		log.Printf("Failed to send killmail embed: %v", err)
-		return
+	// Iterate through all subscriptions and check for a match
+	for channelID, subscribedTopics := range subscriptions {
+		for _, subscribedTopic := range subscribedTopics {
+			// Check if this killmail's topics contain the subscribed topic
+			for _, killmailTopic := range killmailTopics {
+				if subscribedTopic == killmailTopic {
+					// Send the embed to the matching channel
+					_, err := s.ChannelMessageSendEmbed(channelID, embed)
+					if err != nil {
+						log.Printf("Failed to send killmail embed to channel %s: %v", channelID, err)
+					}
+					// Break out of the inner loops once we've sent the message to this channel
+					goto nextChannel
+				}
+			}
+		}
+	nextChannel:
 	}
-	log.Printf("Successfully sent embed for kill %d.", killID)
 }
