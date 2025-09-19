@@ -1,3 +1,7 @@
+
+![unnamed](https://github.com/user-attachments/assets/332e86fb-100e-465e-8def-8f7c807e2e68)
+
+
 # Firehawk Bot 🔥
 
 A high-performance, self-hostable EVE Online Discord bot written in Go.
