@@ -14,8 +14,6 @@ Firehawk is a self-hosted Discord bot for EVE Online, providing real-time killma
 
 It's designed to be lightweight, fast, and easily run by anyone using Docker.
 
-
-
 ---
 
 ## ✨ Features
@@ -57,7 +55,6 @@ Before you begin, you will need:
     Open the newly created `.env` file in a text editor and add your Discord bot token and a contact email (this is required by the ESI API).
     ```env
     DISCORD_BOT_TOKEN=YOUR_SECRET_BOT_TOKEN_HERE
-    ESI_CONTACT_EMAIL=your-email@example.com
     ```
 
 4.  **Build and Run the Bot**

@@ -9,85 +9,85 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// HandleKillmailMessage is the entry point for processing messages from the WebSocket.
+// HandleKillmailMessage serves as the main entry point for processing raw messages from the WebSocket.
+// It determines the message type and directs the data to the appropriate handler.
 func HandleKillmailMessage(s *discordgo.Session, message []byte) {
+	// First, unmarshal the message into our generic SocketMessage to read its type.
 	var msg SocketMessage
 	if err := json.Unmarshal(message, &msg); err != nil {
 		log.Printf("Error unmarshaling socket envelope: %s", string(message))
 		return
 	}
 
+	// Use a switch statement to handle different kinds of server messages.
 	switch msg.Type {
 	case "killmail":
+		// If it's a killmail, unmarshal its specific data payload.
 		var killmailData KillmailData
 		if err := json.Unmarshal(msg.Data, &killmailData); err != nil {
 			log.Printf("Error unmarshaling killmail payload: %v", err)
 			return
 		}
-		// Pass the killmail to the processing function.
+		// Pass the fully parsed killmail to the main processing function.
 		processAndSendKillmail(s, &killmailData)
 
 	case "info", "subscribed", "ping":
+		// Handle standard server status messages by logging them.
 		log.Printf("Received server message: type=%s", msg.Type)
 
 	default:
+		// Log any message types we don't currently handle, for debugging purposes.
 		log.Printf("Received unhandled type: '%s'", msg.Type)
 	}
 }
 
-// --- Killmail Processing and Sending ---
-
-// processAndSendKillmail creates the Discord embed and sends it to all matching subscribed channels.
+// processAndSendKillmail takes parsed killmail data, finds all subscribed channels that
+// match the killmail's topics, and sends a formatted embed to them.
 func processAndSendKillmail(s *discordgo.Session, data *KillmailData) {
-	killID := data.Killmail.KillmailID
-	log.Printf("Processing new killmail: ID %d | Value: %.2f ISK", killID, data.Killmail.TotalValue)
+	log.Printf("Processing new killmail: ID %d | Value: %.2f ISK", data.Killmail.KillmailID, data.Killmail.TotalValue)
 
-	// 1. Generate a set of "tags" or "topics" for this specific killmail.
+	// Step 1: Generate a list of topics (or "tags") for this specific killmail
+	// by calling the helper function from another file.
 	killmailTopics := generateKillmailTopics(data)
 
-	// 2. Build the Discord embed once.
+	// Step 2: Build the rich Discord embed for the killmail. This is done once to avoid repeat work.
 	embed := buildKillmailEmbed(data)
 
-	// 3. Efficiently find and send to subscribed channels.
-	mu.RLock() // Lock for safe concurrent reading of the subscriptions map.
+	// Step 3: Efficiently find matching channels and send the embed.
+	// A read-lock allows multiple killmails to be processed at the same time without data corruption.
+	mu.RLock()
 	defer mu.RUnlock()
 
-	// Create a set of channels we've already posted to, to avoid duplicate messages.
-	sentToChannels := make(map[string]bool)
-
-	// Loop over every topic this killmail generated.
-	for _, kmTopic := range killmailTopics {
-		// Now, loop over every channel that is subscribed to anything.
-		for channelID, subscribedTopics := range subscriptions {
-			// If we've already sent to this channel, skip it.
-			if sentToChannels[channelID] {
-				continue
-			}
-
-			// This is the efficient check: does this channel's set of topics contain our killmail's topic?
-			if _, ok := subscribedTopics[kmTopic]; ok {
+	// Iterate over each channel that has at least one subscription.
+	for channelID, subscribedTopics := range subscriptions {
+		// For each channel, check if any of its subscribed topics match the topics of this killmail.
+		for _, kmTopic := range killmailTopics {
+			// This is an efficient check to see if the key 'kmTopic' exists in the 'subscribedTopics' map.
+			if _, isSubscribed := subscribedTopics[kmTopic]; isSubscribed {
+				// A match is found! The channel is subscribed to a topic this killmail has.
 				_, err := s.ChannelMessageSendEmbed(channelID, embed)
 				if err != nil {
 					log.Printf("Failed to send killmail embed to channel %s: %v", channelID, err)
 				}
-				// Mark this channel as "sent" and stop checking other topics for it.
-				sentToChannels[channelID] = true
+
+				// Since we've found a match and sent the message, we can stop checking topics for this channel
+				// and move on to the next one. This 'break' makes the process much more efficient.
+				break
 			}
 		}
 	}
 }
 
-// --- Helper Functions ---
-
-// buildKillmailEmbed creates the discordgo.MessageEmbed from the killmail data.
+// buildKillmailEmbed is a factory function that constructs a rich Discord embed from killmail data.
 func buildKillmailEmbed(data *KillmailData) *discordgo.MessageEmbed {
+	// Extract key figures for clarity.
 	victim := data.Killmail.Victim
 	var finalBlowAttacker struct {
 		CharacterName   string
 		CorporationName string
 	}
 
-	// Safely find the final blow attacker.
+	// Safely iterate through attackers to find the one who got the final blow.
 	for _, a := range data.Killmail.Attackers {
 		if a.FinalBlow {
 			finalBlowAttacker.CharacterName = a.CharacterName
@@ -95,6 +95,7 @@ func buildKillmailEmbed(data *KillmailData) *discordgo.MessageEmbed {
 			break
 		}
 	}
+	// Provide default values if names are not present (e.g., for NPCs).
 	if finalBlowAttacker.CharacterName == "" {
 		finalBlowAttacker.CharacterName = "Unknown"
 	}
@@ -102,10 +103,11 @@ func buildKillmailEmbed(data *KillmailData) *discordgo.MessageEmbed {
 		finalBlowAttacker.CorporationName = "Unknown"
 	}
 
+	// Assemble and return the complete embed structure.
 	return &discordgo.MessageEmbed{
 		Title:     fmt.Sprintf("%s destroyed in %s", victim.ShipName.En, data.Killmail.SystemName),
 		URL:       fmt.Sprintf("https://eve-kill.com/kill/%d", data.Killmail.KillmailID),
-		Color:     0xBF2A2A, // Red
+		Color:     0xBF2A2A, // A deep red color
 		Timestamp: data.Killmail.KillmailTime.Format(time.RFC3339),
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: fmt.Sprintf("https://images.evetech.net/types/%d/render?size=128", victim.ShipID),

@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  bot:
+    # Build the Docker image from the Dockerfile in the current directory.
+    build: .
+
+    # Set a friendly name for the container for easy identification.
+    container_name: firehawk-bot
+
+    # This policy ensures the bot automatically restarts if it crashes or after a server reboot.
+    restart: unless-stopped
+
+    # Securely load your bot token and any other secrets from a local .env file.
+    env_file:
+      - .env
+
+    # This is the most crucial part for data persistence.
+    # It links the 'subscriptions.json' file inside the container to the one on your computer.
+    # Your data will be safe even if the container is deleted.
+    volumes:
+      - ./subscriptions.json:/app/subscriptions.json

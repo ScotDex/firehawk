@@ -7,17 +7,6 @@ import (
 	"os"
 )
 
-func hasTopicMatch(killmailTopics, subscribedTopics []string) bool {
-	for _, kTopic := range killmailTopics {
-		for _, sTopic := range subscribedTopics {
-			if kTopic == sTopic {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func goSafely(fn func()) {
 	go func() {
 		defer func() {
