@@ -34,6 +34,7 @@ COPY --from=builder /app/firehawk .
 COPY esi_cache.json .
 COPY systems.json .
 COPY .env .
+COPY subscriptions.json .
 
 # (Optional) If you were using a local cache file, you would copy it here too.
 # COPY esi_cache.json .

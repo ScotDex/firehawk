@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync" // Import the sync package for mutex
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -12,6 +13,8 @@ import (
 )
 
 var subscriptions = make(map[string][]string)
+var mu sync.Mutex                     // Mutex to protect the subscriptions map
+var SubMapFile = "subscriptions.json" // File path for the JSON cache
 
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
 	{Name: "All Kills", Value: "all"}, {Name: "Big Kills", Value: "bigkills"},
@@ -147,18 +150,19 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
 		for _, opt := range i.ApplicationCommandData().Options {
 			optionMap[opt.Name] = opt
 		}
 
-		// Determine the target channel
 		channelID := i.ChannelID
 		if channelOption, ok := optionMap["channel"]; ok {
 			channelID = channelOption.ChannelValue(s).ID
 		}
 
-		// Collect all topics the user provided
 		topicsToAdd := []string{}
 		for j := 1; j <= 5; j++ {
 			topicName := fmt.Sprintf("topic%d", j)
@@ -167,7 +171,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			}
 		}
 
-		// Add new topics, avoiding duplicates
 		newlyAdded := []string{}
 		alreadyExists := []string{}
 		existingTopics := subscriptions[channelID]
@@ -188,15 +191,12 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			}
 		}
 
-		// --- SAVE THE SUBSCRIPTIONS TO THE CACHE FILE ---
 		if len(newlyAdded) > 0 {
-			if err := esiClient.SaveCacheToFile(cacheFilePath); err != nil {
+			if err := saveSubscriptionsToFile(); err != nil {
 				log.Printf("CRITICAL: Failed to save subscriptions to cache: %v", err)
-				// You might want to send an error message to the user here
 			}
 		}
 
-		// Build a clear response message for the user
 		var responseBuilder strings.Builder
 		if len(newlyAdded) > 0 {
 			responseBuilder.WriteString(fmt.Sprintf("✅ Subscribed channel <#%s> to: %s\n", channelID, strings.Join(newlyAdded, ", ")))
@@ -248,6 +248,9 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"unsubscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
 		for _, opt := range i.ApplicationCommandData().Options {
 			optionMap[opt.Name] = opt
@@ -285,6 +288,10 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			subscriptions[channelID] = newTopics
 			responseMessage = fmt.Sprintf("✅ Unsubscribed channel <#%s> from the '%s' topic.", channelID, topicToRemove)
 			log.Printf("Subscription removed: Channel %s, Topic %s", channelID, topicToRemove)
+
+			if err := saveSubscriptionsToFile(); err != nil {
+				log.Printf("CRITICAL: Failed to save subscriptions to cache: %v", err)
+			}
 		}
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

@@ -50,6 +50,9 @@ func main() {
 		log.Fatalf("Error creating Discord session: %v", err)
 	}
 
+	// In your main() function or a separate initialization function
+	loadSubscriptions()
+
 	dg.AddHandler(interactionCreate)
 
 	err = dg.Open()

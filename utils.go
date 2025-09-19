@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 )
 
 func hasTopicMatch(killmailTopics, subscribedTopics []string) bool {
@@ -123,4 +125,46 @@ func generateKillmailTopics(data *KillmailData) []string {
 	}
 
 	return topics
+}
+
+// saveSubscriptionsToFile saves the current subscriptions to a JSON file.
+// CORRECTED VERSION
+
+// 1. Change the function signature to declare it returns an error.
+func saveSubscriptionsToFile() error {
+	// A mutex lock is crucial here to prevent a race condition
+	// if two users run /subscribe at the same time.
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, err := json.MarshalIndent(subscriptions, "", "    ")
+	if err != nil {
+		// 2. Instead of just logging, RETURN the error. The caller will handle it.
+		return fmt.Errorf("error marshaling subscriptions: %w", err)
+	}
+
+	// Use your SubMapFile variable instead of a hardcoded string.
+	err = os.WriteFile(SubMapFile, file, 0644)
+	if err != nil {
+		// 3. Return this error as well.
+		return fmt.Errorf("error writing subscriptions file: %w", err)
+	}
+
+	// 4. If we get to the end without errors, return nil to signal success.
+	return nil
+}
+
+func loadSubscriptions() {
+	mu.Lock()
+	defer mu.Unlock()
+	data, err := os.ReadFile("subscriptions.json")
+	if err != nil {
+		log.Printf("Could not read subscriptions.json, starting with empty subscriptions: %v", err)
+		return
+	}
+
+	err = json.Unmarshal(data, &subscriptions)
+	if err != nil {
+		log.Printf("Error unmarshaling subscriptions from JSON: %v", err)
+	}
 }
