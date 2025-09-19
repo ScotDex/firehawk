@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
-	"sync" // Import the sync package for mutex
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -12,9 +14,81 @@ import (
 	"golang.org/x/text/message"
 )
 
-var subscriptions = make(map[string][]string)
-var mu sync.Mutex                     // Mutex to protect the subscriptions map
-var SubMapFile = "subscriptions.json" // File path for the JSON cache
+// --- Global Variables & Configuration ---
+
+// Using a map of maps (a "set") for topics is more efficient for lookups and removals.
+var subscriptions = make(map[string]map[string]bool)
+var mu sync.RWMutex // RWMutex allows multiple readers, which is slightly more efficient.
+var SubMapFile = "subscriptions.json"
+
+// Note: You will need to add your esiClient initialisation back in here.
+// var esiClient = &ESIClient{}
+
+// --- Core Subscription Logic ---
+
+// loadSubscriptionsFromFile reads the JSON file into memory when the bot starts.
+func loadSubscriptionsFromFile() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	data, err := os.ReadFile(SubMapFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Println("subscriptions.json not found, starting with empty subscriptions.")
+			return
+		}
+		log.Printf("Error reading subscriptions file: %v", err)
+		return
+	}
+
+	if len(data) == 0 {
+		log.Println("subscriptions.json is empty, starting with empty subscriptions.")
+		return
+	}
+
+	// The file stores a map[string][]string, so we load it into a temporary structure.
+	var subsFromFile map[string][]string
+	if err := json.Unmarshal(data, &subsFromFile); err != nil {
+		log.Printf("Error unmarshaling subscriptions JSON: %v", err)
+		return
+	}
+
+	// Convert the loaded data to our more efficient map[string]map[string]bool structure.
+	for channelID, topics := range subsFromFile {
+		if subscriptions[channelID] == nil {
+			subscriptions[channelID] = make(map[string]bool)
+		}
+		for _, topic := range topics {
+			subscriptions[channelID][topic] = true
+		}
+	}
+	log.Printf("Successfully loaded subscriptions for %d channels.", len(subscriptions))
+}
+
+// saveSubscriptionsToFile writes the current subscription map to the JSON file.
+func saveSubscriptionsToFile() error {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	// Convert our efficient map back to the simple map[string][]string for storage.
+	subsToSave := make(map[string][]string)
+	for channelID, topicsSet := range subscriptions {
+		topics := make([]string, 0, len(topicsSet))
+		for topic := range topicsSet {
+			topics = append(topics, topic)
+		}
+		subsToSave[channelID] = topics
+	}
+
+	data, err := json.MarshalIndent(subsToSave, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error marshaling subscriptions: %w", err)
+	}
+
+	return os.WriteFile(SubMapFile, data, 0644)
+}
+
+// --- Command Definitions ---
 
 var killmailTopicChoices = []*discordgo.ApplicationCommandOptionChoice{
 	{Name: "All Kills", Value: "all"}, {Name: "Big Kills", Value: "bigkills"},
@@ -39,47 +113,12 @@ var commands = []*discordgo.ApplicationCommand{
 		Name:        "subscribe",
 		Description: "Subscribe this channel to a killmail feed",
 		Options: []*discordgo.ApplicationCommandOption{
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic1",
-				Description: "The first feed to subscribe to",
-				Required:    true,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic2",
-				Description: "The second feed to subscribe to",
-				Required:    false,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic3",
-				Description: "The third feed to subscribe to",
-				Required:    false,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic4",
-				Description: "The fourth feed to subscribe to",
-				Required:    false,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionString,
-				Name:        "topic5",
-				Description: "The fifth feed to subscribe to",
-				Required:    false,
-				Choices:     killmailTopicChoices,
-			},
-			{
-				Type:        discordgo.ApplicationCommandOptionChannel,
-				Name:        "channel",
-				Description: "The channel to subscribe to (defaults to current channel)",
-				Required:    false,
-			},
+			{Type: discordgo.ApplicationCommandOptionString, Name: "topic1", Description: "The first feed to subscribe to", Required: true, Choices: killmailTopicChoices},
+			{Type: discordgo.ApplicationCommandOptionString, Name: "topic2", Description: "The second feed to subscribe to", Required: false, Choices: killmailTopicChoices},
+			{Type: discordgo.ApplicationCommandOptionString, Name: "topic3", Description: "The third feed to subscribe to", Required: false, Choices: killmailTopicChoices},
+			{Type: discordgo.ApplicationCommandOptionString, Name: "topic4", Description: "The fourth feed to subscribe to", Required: false, Choices: killmailTopicChoices},
+			{Type: discordgo.ApplicationCommandOptionString, Name: "topic5", Description: "The fifth feed to subscribe to", Required: false, Choices: killmailTopicChoices},
+			{Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to subscribe to (defaults to current channel)", Required: false},
 		},
 	},
 	{Name: "unsubscribe", Description: "Unsubscribe this channel from a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to unsubscribe from", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to unsubscribe", Required: false}}},
@@ -87,7 +126,123 @@ var commands = []*discordgo.ApplicationCommand{
 	{Name: "group", Description: "Provides intel on a specific corporation.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "corporations", Description: "The name of a corporation you want to scout.", Required: true}}},
 	{Name: "tools", Description: "An up to date list of third party tools for Eve Online"},
 }
+
+// --- Command Handlers ---
+
 var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		// 1. Immediately defer the response to avoid timeouts.
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		})
+
+		// --- Option Parsing ---
+		options := i.ApplicationCommandData().Options
+		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+		for _, opt := range options {
+			optionMap[opt.Name] = opt
+		}
+
+		channelID := i.ChannelID
+		if opt, ok := optionMap["channel"]; ok {
+			channelID = opt.ChannelValue(s).ID
+		}
+
+		var topicsToAdd []string
+		for i := 1; i <= 5; i++ {
+			if opt, ok := optionMap[fmt.Sprintf("topic%d", i)]; ok {
+				topicsToAdd = append(topicsToAdd, opt.StringValue())
+			}
+		}
+
+		// --- Subscription Logic ---
+		mu.Lock()
+		var newlyAdded, alreadyExists []string
+		if subscriptions[channelID] == nil {
+			subscriptions[channelID] = make(map[string]bool)
+		}
+		for _, topic := range topicsToAdd {
+			if subscriptions[channelID][topic] {
+				alreadyExists = append(alreadyExists, fmt.Sprintf("`%s`", topic))
+			} else {
+				subscriptions[channelID][topic] = true
+				newlyAdded = append(newlyAdded, fmt.Sprintf("`%s`", topic))
+			}
+		}
+		mu.Unlock() // Unlock before file I/O
+
+		// --- Save and Respond ---
+		if len(newlyAdded) > 0 {
+			if err := saveSubscriptionsToFile(); err != nil {
+				log.Printf("CRITICAL: Failed to save subscriptions: %v", err)
+				// Let the user know something went wrong
+				content := "❌ Error saving subscriptions. Please try again later."
+				s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &content})
+				return
+			}
+		}
+
+		var b strings.Builder
+		if len(newlyAdded) > 0 {
+			b.WriteString(fmt.Sprintf("✅ Subscribed channel <#%s> to: %s\n", channelID, strings.Join(newlyAdded, ", ")))
+		}
+		if len(alreadyExists) > 0 {
+			b.WriteString(fmt.Sprintf("⚠️ Already subscribed to: %s", strings.Join(alreadyExists, ", ")))
+		}
+
+		content := b.String()
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &content})
+	},
+
+	"unsubscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+		// 1. Defer response. Make it ephemeral (only user can see it).
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{Flags: discordgo.MessageFlagsEphemeral},
+		})
+
+		// --- Option Parsing ---
+		options := i.ApplicationCommandData().Options
+		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+		for _, opt := range options {
+			optionMap[opt.Name] = opt
+		}
+
+		topicToRemove := optionMap["topic"].StringValue()
+		channelID := i.ChannelID
+		if opt, ok := optionMap["channel"]; ok {
+			channelID = opt.ChannelValue(s).ID
+		}
+
+		// --- Subscription Logic ---
+		mu.Lock()
+		topicWasFound := false
+		if subs, ok := subscriptions[channelID]; ok && subs[topicToRemove] {
+			delete(subscriptions[channelID], topicToRemove)
+			if len(subscriptions[channelID]) == 0 {
+				delete(subscriptions, channelID)
+			}
+			topicWasFound = true
+		}
+		mu.Unlock()
+
+		// --- Save and Respond ---
+		var content string
+		if topicWasFound {
+			if err := saveSubscriptionsToFile(); err != nil {
+				log.Printf("CRITICAL: Failed to save subscriptions: %v", err)
+				content = "❌ Error saving subscriptions. Please try again later."
+			} else {
+				content = fmt.Sprintf("✅ Unsubscribed channel <#%s> from the `%s` topic.", channelID, topicToRemove)
+				log.Printf("Subscription removed: Channel %s, Topic %s", channelID, topicToRemove)
+			}
+		} else {
+			content = fmt.Sprintf("⚠️ Channel <#%s> was not subscribed to the `%s` topic.", channelID, topicToRemove)
+		}
+
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &content})
+	},
+
 	"status": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -149,70 +304,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		})
 	},
 
-	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
-		for _, opt := range i.ApplicationCommandData().Options {
-			optionMap[opt.Name] = opt
-		}
-
-		channelID := i.ChannelID
-		if channelOption, ok := optionMap["channel"]; ok {
-			channelID = channelOption.ChannelValue(s).ID
-		}
-
-		topicsToAdd := []string{}
-		for j := 1; j <= 5; j++ {
-			topicName := fmt.Sprintf("topic%d", j)
-			if topicOption, ok := optionMap[topicName]; ok {
-				topicsToAdd = append(topicsToAdd, topicOption.StringValue())
-			}
-		}
-
-		newlyAdded := []string{}
-		alreadyExists := []string{}
-		existingTopics := subscriptions[channelID]
-
-		for _, topic := range topicsToAdd {
-			isDuplicate := false
-			for _, existing := range existingTopics {
-				if topic == existing {
-					isDuplicate = true
-					break
-				}
-			}
-			if isDuplicate {
-				alreadyExists = append(alreadyExists, fmt.Sprintf("`%s`", topic))
-			} else {
-				subscriptions[channelID] = append(subscriptions[channelID], topic)
-				newlyAdded = append(newlyAdded, fmt.Sprintf("`%s`", topic))
-			}
-		}
-
-		if len(newlyAdded) > 0 {
-			if err := saveSubscriptionsToFile(); err != nil {
-				log.Printf("CRITICAL: Failed to save subscriptions to cache: %v", err)
-			}
-		}
-
-		var responseBuilder strings.Builder
-		if len(newlyAdded) > 0 {
-			responseBuilder.WriteString(fmt.Sprintf("✅ Subscribed channel <#%s> to: %s\n", channelID, strings.Join(newlyAdded, ", ")))
-		}
-		if len(alreadyExists) > 0 {
-			responseBuilder.WriteString(fmt.Sprintf("⚠️ Already subscribed to: %s", strings.Join(alreadyExists, ", ")))
-		}
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: responseBuilder.String(),
-			},
-		})
-	},
-
 	"tools": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		toolLinks := []string{
 			"[EVE-KILL](https://eve-kill.com/)",
@@ -244,59 +335,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			Data: &discordgo.InteractionResponseData{
 				Embeds: []*discordgo.MessageEmbed{embed},
 			},
-		})
-	},
-
-	"unsubscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
-		for _, opt := range i.ApplicationCommandData().Options {
-			optionMap[opt.Name] = opt
-		}
-		topicToRemove := optionMap["topic"].StringValue()
-		channelID := i.ChannelID
-		if channelOption, ok := optionMap["channel"]; ok {
-			channelID = channelOption.ChannelValue(s).ID
-		}
-
-		originalTopics, found := subscriptions[channelID]
-		if !found || len(originalTopics) == 0 {
-			responseMessage := "⚠️ This channel isn't subscribed to any topics."
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
-			})
-			return
-		}
-
-		newTopics := []string{}
-		topicWasFound := false
-		for _, topic := range originalTopics {
-			if topic != topicToRemove {
-				newTopics = append(newTopics, topic)
-			} else {
-				topicWasFound = true
-			}
-		}
-
-		var responseMessage string
-		if !topicWasFound {
-			responseMessage = fmt.Sprintf("⚠️ Channel <#%s> was not subscribed to the '%s' topic.", channelID, topicToRemove)
-		} else {
-			subscriptions[channelID] = newTopics
-			responseMessage = fmt.Sprintf("✅ Unsubscribed channel <#%s> from the '%s' topic.", channelID, topicToRemove)
-			log.Printf("Subscription removed: Channel %s, Topic %s", channelID, topicToRemove)
-
-			if err := saveSubscriptionsToFile(); err != nil {
-				log.Printf("CRITICAL: Failed to save subscriptions to cache: %v", err)
-			}
-		}
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{Content: responseMessage, Flags: discordgo.MessageFlagsEphemeral},
 		})
 	},
 
@@ -365,6 +403,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			log.Printf("Failed to send scout followup message: %v", err)
 		}
 	},
+
 	"group": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -413,6 +452,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			log.Printf("Failed to send scout followup message: %v", err)
 		}
 	},
+
 	"alliance": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,

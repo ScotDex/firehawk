@@ -61,7 +61,6 @@ func (c *ESIClient) SaveCacheToFile(filePath string) error {
 		CorporationNames: c.corporationNames,
 		ShipNames:        c.shipNames,
 		SystemNames:      c.systemNames,
-		Subscriptions:    subscriptions,
 		SearchResults:    c.searchResults,
 	}
 
@@ -103,12 +102,7 @@ func (c *ESIClient) LoadCacheFromFile(filePath string) error {
 	c.corporationNames = data.CorporationNames
 	c.shipNames = data.ShipNames
 	c.systemNames = data.SystemNames
-	subscriptions = data.Subscriptions
 	c.searchResults = data.SearchResults
-
-	if subscriptions == nil {
-		subscriptions = make(map[string][]string)
-	}
 
 	log.Println("Successfully loaded ESI cache from", filePath)
 	return nil
