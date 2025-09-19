@@ -34,7 +34,6 @@ Firehawk is designed to be self-hosted using Docker. Follow these instructions t
 Before you begin, you will need:
 * [Docker](https://www.docker.com/get-started) and Docker Compose installed on your system.
 * A **Discord Bot Token**. You can get one by creating a new application in the [Discord Developer Portal](https://discord.com/developers/applications).
-*test
 
 ### Installation
 
