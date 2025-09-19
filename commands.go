@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"golang.org/x/text/language" // <-- 1. Import language package
+	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
 
@@ -32,7 +32,53 @@ var commands = []*discordgo.ApplicationCommand{
 	{Name: "status", Description: "Live Tranquility Status"},
 	{Name: "scout", Description: "Provides intel on a specific solar system.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "system_name", Description: "The name of the solar system to scout.", Required: true}}},
 	{Name: "lookup", Description: "Lookup an EVE Online character by name", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "character_name", Description: "Name of the character (exact spelling required).", Required: true}}},
-	{Name: "subscribe", Description: "Subscribe this channel to a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to subscribe to", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to subscribe to", Required: false}}},
+	{
+		Name:        "subscribe",
+		Description: "Subscribe this channel to a killmail feed",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "topic1",
+				Description: "The first feed to subscribe to",
+				Required:    true,
+				Choices:     killmailTopicChoices,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "topic2",
+				Description: "The second feed to subscribe to",
+				Required:    false,
+				Choices:     killmailTopicChoices,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "topic3",
+				Description: "The third feed to subscribe to",
+				Required:    false,
+				Choices:     killmailTopicChoices,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "topic4",
+				Description: "The fourth feed to subscribe to",
+				Required:    false,
+				Choices:     killmailTopicChoices,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "topic5",
+				Description: "The fifth feed to subscribe to",
+				Required:    false,
+				Choices:     killmailTopicChoices,
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionChannel,
+				Name:        "channel",
+				Description: "The channel to subscribe to (defaults to current channel)",
+				Required:    false,
+			},
+		},
+	},
 	{Name: "unsubscribe", Description: "Unsubscribe this channel from a killmail feed", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "topic", Description: "The feed to unsubscribe from", Required: true, Choices: killmailTopicChoices}, {Type: discordgo.ApplicationCommandOptionChannel, Name: "channel", Description: "The channel to unsubscribe", Required: false}}},
 	{Name: "alliance", Description: "Provides intel on a specific alliance.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "alliances", Description: "The name of an alliance you want to scout.", Required: true}}},
 	{Name: "group", Description: "Provides intel on a specific corporation.", Options: []*discordgo.ApplicationCommandOption{{Type: discordgo.ApplicationCommandOptionString, Name: "corporations", Description: "The name of a corporation you want to scout.", Required: true}}},
@@ -100,7 +146,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		})
 	},
 
-	// In your 'commandHandlers' map
 	"subscribe": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
 		for _, opt := range i.ApplicationCommandData().Options {
@@ -115,8 +160,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 
 		// Collect all topics the user provided
 		topicsToAdd := []string{}
-		for i := 1; i <= 5; i++ { // Check for topic1, topic2, etc.
-			topicName := fmt.Sprintf("topic%d", i)
+		for j := 1; j <= 5; j++ {
+			topicName := fmt.Sprintf("topic%d", j)
 			if topicOption, ok := optionMap[topicName]; ok {
 				topicsToAdd = append(topicsToAdd, topicOption.StringValue())
 			}
@@ -179,13 +224,11 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			"[Eve Buddy](https://github.com/ErikKalkoken/evebuddy)",
 		}
 
-		// You will need to import the "strings" package for this to work.
 		var description strings.Builder
 		for _, link := range toolLinks {
 			description.WriteString(fmt.Sprintf("• %s\n", link))
 		}
 
-		// First, create the complete embed.
 		corpLogoURL := esiClient.GetRandomCorporationLogoURL()
 		embed := &discordgo.MessageEmbed{
 			Title:       "EVE Community Tools",
@@ -196,12 +239,11 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			},
 		}
 
-		// Then, send the response containing the embed.
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Embeds: []*discordgo.MessageEmbed{embed},
-			}, // <-- The missing '}' was here.
+			},
 		})
 	},
 
@@ -252,16 +294,13 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 	},
 
 	"scout": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		// 1. Defer the response so Discord knows we're working on it.
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 
-		// 2. Get the system name from the user's input.
 		options := i.ApplicationCommandData().Options
 		systemName := options[0].StringValue()
 
-		// 3. Call your API search function.
 		searchResult, err := esiClient.performSearch(systemName)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", systemName, err)
@@ -272,11 +311,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 4. Filter the results to find the system.
-		// (This assumes you have the findSystemInResults function we discussed)
 		systemHit, err := findHitByType(searchResult, "system")
 		if err != nil {
-			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find a system named `%s`.", systemName)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 				Content: &errorMessage,
@@ -301,7 +337,7 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		embed := &discordgo.MessageEmbed{
 			Title: fmt.Sprintf("Intel Report: %s", systemHit.Name),
 			URL:   finalURL,
-			Color: secStatusColor, // A nice blue color
+			Color: secStatusColor,
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "System Details", Value: finalURL, Inline: false},
 				{Name: "System Report Link", Value: fmt.Sprintf("%v", systemHit.Name), Inline: false},
@@ -315,7 +351,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 
-		// 6. Send the final message.
 		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Embeds: []*discordgo.MessageEmbed{embed},
 		})
@@ -324,16 +359,13 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 	},
 	"group": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		// 1. Defer the response so Discord knows we're working on it.
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 
-		// 2. Get the system name from the user's input.
 		options := i.ApplicationCommandData().Options
 		corporationNames := options[0].StringValue()
 
-		// 3. Call your API search function.
 		searchResult, err := esiClient.performSearch(corporationNames)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", corporationNames, err)
@@ -344,11 +376,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 4. Filter the results to find the system.
-		// (This assumes you have the findSystemInResults function we discussed)
 		corpHit, err := findHitByType(searchResult, "corporation")
 		if err != nil {
-			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find a corporation named `%s`.", corporationNames)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 				Content: &errorMessage,
@@ -356,12 +385,10 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 5. Format a nice reply with an embed.
-		// (You can add more fields here later, like security status, region, etc.)
 		finalURL := fmt.Sprintf("https://eve-kill.com/corporation/%d", corpHit.ID)
 		embed := &discordgo.MessageEmbed{
 			Title: fmt.Sprintf("Intel Report: %s", corporationNames),
-			Color: 0x00bfff, // A nice blue color
+			Color: 0x00bfff,
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "System Details", Value: finalURL, Inline: true},
 				{Name: "EVE-KILL Link", Value: fmt.Sprintf("[View Corporation](%s)", finalURL)},
@@ -372,7 +399,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 
-		// 6. Send the final message.
 		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Embeds: []*discordgo.MessageEmbed{embed},
 		})
@@ -381,16 +407,13 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 		}
 	},
 	"alliance": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		// 1. Defer the response so Discord knows we're working on it.
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		})
 
-		// 2. Get the system name from the user's input.
 		options := i.ApplicationCommandData().Options
 		allianceName := options[0].StringValue()
 
-		// 3. Call your API search function.
 		searchResult, err := esiClient.performSearch(allianceName)
 		if err != nil {
 			log.Printf("Error performing search for '%s': %v", allianceName, err)
@@ -401,11 +424,8 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 4. Filter the results to find the system.
-		// (This assumes you have the findSystemInResults function we discussed)
 		allianceHit, err := findHitByType(searchResult, "alliance")
 		if err != nil {
-			// This error means a system wasn't found in the results.
 			errorMessage := fmt.Sprintf("❌ Could not find an alliance named `%s`.", allianceHit.Name)
 			s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 				Content: &errorMessage,
@@ -413,12 +433,10 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			return
 		}
 
-		// 5. Format a nice reply with an embed.
-		// (You can add more fields here later, like security status, region, etc.)
 		finalURL := fmt.Sprintf("https://eve-kill.com/alliance/%d", allianceHit.ID)
 		embed := &discordgo.MessageEmbed{
 			Title: fmt.Sprintf("Intel Report: %s", allianceHit.Name),
-			Color: 0x00bfff, // A nice blue color
+			Color: 0x00bfff,
 			Fields: []*discordgo.MessageEmbedField{
 				{Name: "Alliance Details", Value: finalURL, Inline: true},
 				{Name: "EVE-KILL Link", Value: fmt.Sprintf("[View Alliance](%s)", finalURL)},
@@ -429,7 +447,6 @@ var commandHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interac
 			Timestamp: time.Now().Format(time.RFC3339),
 		}
 
-		// 6. Send the final message.
 		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Embeds: []*discordgo.MessageEmbed{embed},
 		})
