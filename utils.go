@@ -157,14 +157,32 @@ func saveSubscriptionsToFile() error {
 func loadSubscriptions() {
 	mu.Lock()
 	defer mu.Unlock()
-	data, err := os.ReadFile("subscriptions.json")
+
+	data, err := os.ReadFile("subscriptions.json") // Use your SubMapFile variable
+
+	// Case 1: Handle errors during file reading.
 	if err != nil {
-		log.Printf("Could not read subscriptions.json, starting with empty subscriptions: %v", err)
+		// If the file simply doesn't exist, that's okay. We'll just start fresh.
+		if os.IsNotExist(err) {
+			log.Println("subscriptions.json not found, starting with empty subscriptions.")
+			return
+		}
+		// For any other reading error, log it as a more serious problem.
+		log.Printf("Error reading subscriptions.json: %v", err)
 		return
 	}
 
+	// Case 2: If the file exists but is empty, there's nothing to load.
+	if len(data) == 0 {
+		log.Println("subscriptions.json is empty, starting with empty subscriptions.")
+		return
+	}
+
+	// Only if we have data, we try to unmarshal it.
 	err = json.Unmarshal(data, &subscriptions)
 	if err != nil {
 		log.Printf("Error unmarshaling subscriptions from JSON: %v", err)
+	} else {
+		log.Printf("Successfully loaded %d channel(s) with subscriptions.", len(subscriptions))
 	}
 }
